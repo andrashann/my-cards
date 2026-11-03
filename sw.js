@@ -6,7 +6,12 @@
  *
  * Needs http(s). Opened as a file:// URL the page skips registration.
  */
-const CACHE = 'qr-cards-v2';
+/* Bump this on every deploy. Changing these bytes is what tells the browser
+   the worker is new, and only a new worker re-downloads the shell with
+   cache: 'reload'. Leave it alone and an updated page arrives a launch late,
+   through the background refresh below, and no sooner than the host's own
+   cache header allows. */
+const CACHE = 'qr-cards-v3';
 
 /* Everything the page needs to run with no network at all. The two readers
    are included even though the page loads them lazily, so that scanning

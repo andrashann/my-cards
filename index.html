@@ -1032,6 +1032,7 @@ input[type=text].hexin { width: 7.5em; flex: none; }
     currentCard = null;
     if (!byId('scrim')) document.body.style.overflow = '';
     keepAwake(false);
+    reloadIfIdle();
   }
 
   /* ------------------------- camera scanner ------------------------- */
@@ -1242,6 +1243,7 @@ input[type=text].hexin { width: 7.5em; flex: none; }
     stopStream();
     if (scanner) { scanner.remove(); scanner = null; }
     if (!byId('scrim') && !view) document.body.style.overflow = '';
+    reloadIfIdle();
   }
 
   /* Scanning straight from the bar: read a code, then open the editor on it. */
@@ -1490,6 +1492,7 @@ input[type=text].hexin { width: 7.5em; flex: none; }
     if (s) s.remove();
     editing = null;
     if (!view && !scanner) document.body.style.overflow = '';
+    reloadIfIdle();
   }
 
   document.addEventListener('keydown', function (e) {
@@ -1610,9 +1613,30 @@ input[type=text].hexin { width: 7.5em; flex: none; }
     } catch (e) { /* no icon, no problem */ }
   })();
 
+  /* A new worker takes over the moment it has installed, because sw.js calls
+     skipWaiting, and the page it takes over from is the one from before the
+     deploy. Reloading once puts the new version on screen on this launch
+     rather than the next. Never in the middle of something: a reload while a
+     card, the scanner, or the editor is open would throw away what is on
+     screen, so it waits for the way out. */
+  var swStale = false;
+  function reloadIfIdle() {
+    if (!swStale || view || scanner || byId('scrim')) return;
+    swStale = false;
+    location.reload();
+  }
+
   // Offline support, so the page still opens in a shop with no signal.
   // Service workers need http(s); from a file:// URL this is skipped.
   if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+    // Nothing was in control on a first visit, so the worker claiming this
+    // page is not a new version of anything and there is nothing to reload.
+    var controlled = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (!controlled) return;
+      swStale = true;
+      reloadIfIdle();
+    });
     navigator.serviceWorker.register('sw.js').then(function () {
       byId('install-tip').innerHTML = 'On iPhone: open this in Safari, tap Share, then ' +
         '<b>Add to Home Screen</b>. You get an icon that opens full screen with no address bar, and your ' +

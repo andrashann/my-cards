@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Update check</title>
+<style>
+  body { font: 13px/1.5 ui-monospace, monospace; margin: 16px; }
+  iframe { width: 390px; height: 700px; border: 1px solid #ccc; }
+  pre { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>Update check</h1>
+<pre id="out">running…</pre>
+<div id="stage"></div>
+
+<script>
+/* What a published copy does when a new one is deployed under it. The test
+   server stamps each build into a meta tag and into the worker's cache name,
+   so moving it on is a deploy. tests/run-browser-tests.mjs serves this. */
+(function () {
+  'use strict';
+  var log = [], fails = 0, loads = 0, f = null;
+
+  function ok(pass, what) {
+    log.push((pass ? 'ok    ' : 'FAIL  ') + what);
+    if (!pass) fails++;
+    document.getElementById('out').textContent = log.join('\n');
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  async function until(test, ms) {
+    var t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      if (test()) return true;
+      await wait(100);
+    }
+    return false;
+  }
+
+  function build() {
+    try {
+      var m = f.contentDocument.querySelector('meta[name=build]');
+      return m ? Number(m.content) : 0;
+    } catch (e) { return 0; }   // mid-reload
+  }
+  function controlled() {
+    try { return !!f.contentWindow.navigator.serviceWorker.controller; }
+    catch (e) { return false; }
+  }
+  function deploy(n) { return fetch('/__build/' + n, { method: 'POST' }); }
+  function reload() {
+    var was = loads;
+    f.contentWindow.location.reload();
+    return until(function () { return loads > was; }, 8000);
+  }
+
+  function start() {
+    return new Promise(function (done) {
+      localStorage.setItem('qr-cards.v1', JSON.stringify([{
+        id: 'c1', name: 'Example Market', label: '', payload: '4012345678901',
+        format: 'EAN_13', color: '#2a78d6'
+      }]));
+      f = document.createElement('iframe');
+      f.addEventListener('load', function () { loads++; });
+      f.src = '../index.html';
+      document.getElementById('stage').innerHTML = '';
+      document.getElementById('stage').appendChild(f);
+      until(function () { return loads > 0; }, 8000).then(done);
+    });
+  }
+
+  async function run() {
+    await start();
+    ok(build() === 1, 'the first launch is on build 1, got ' + build());
+    ok(await until(controlled, 8000), 'the worker takes control of the page');
+
+    // --- a deploy, then the next launch ---
+    await deploy(2);
+    await reload();
+    var seen = loads;
+    ok(await until(function () { return build() === 2; }, 10000),
+      'the launch after a deploy ends up on build 2, got ' + build());
+    ok(loads === seen + 1, 'by reloading itself exactly once, got ' + (loads - seen));
+
+    // --- and then it settles ---
+    seen = loads;
+    await wait(2500);
+    ok(build() === 2 && loads === seen, 'it then stays put, got build ' + build() +
+      ' after ' + (loads - seen) + ' more loads');
+
+    // --- a deploy while a card is open waits for the card to be put away ---
+    await deploy(3);
+    await reload();
+    f.contentDocument.querySelector('.slot .tile').click();
+    ok(!!f.contentDocument.querySelector('.codeview'), 'a card is open at the till');
+    await wait(4000);
+    ok(!!f.contentDocument.querySelector('.codeview') && build() === 2,
+      'the update waits rather than closing it, got build ' + build() +
+      ' and ' + (f.contentDocument.querySelector('.codeview') ? 'the card up' : 'no card'));
+    f.contentDocument.querySelector('.cv-btn').click();   // Done
+    ok(await until(function () { return build() === 3; }, 8000),
+      'and lands as soon as the card is put away, got ' + build());
+
+    // --- nothing was lost on the way through ---
+    var kept = JSON.parse(localStorage.getItem('qr-cards.v1') || '[]');
+    ok(kept.length === 1 && kept[0].payload === '4012345678901',
+      'the saved card is still there after three updates, got ' + JSON.stringify(kept));
+    ok(f.contentDocument.querySelectorAll('.slot').length === 1,
+      'and the list still shows it');
+
+    log.push(fails ? '\n' + fails + ' failing' : '\nall passing');
+    document.getElementById('out').textContent = log.join('\n');
+    try {
+      await fetch('/__result', { method: 'POST', body: log.join('\n') });
+    } catch (e) { /* opened by hand, so just read the page */ }
+  }
+
+  run().catch(function (e) {
+    log.push('FAIL  threw: ' + (e && e.message));
+    document.getElementById('out').textContent = log.join('\n');
+    try { fetch('/__result', { method: 'POST', body: log.join('\n') }); } catch (x) {}
+  });
+})();
+</script>
+</body>
+</html>

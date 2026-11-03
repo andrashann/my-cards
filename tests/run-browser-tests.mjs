@@ -11,7 +11,7 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
-const PAGES = ['reorder-drag.html', 'code-view.html'];
+const PAGES = ['reorder-drag.html', 'code-view.html', 'sw-update.html'];
 const args = process.argv.slice(2).filter((a) => a !== '--show');
 const SHOW = process.argv.includes('--show');
 const pages = args.length
@@ -32,20 +32,49 @@ const CHROME = process.env.CHROME ||
 // Each harness posts its report back when it has finished.
 let settle = () => {};
 
+/* Which deploy is being served. tests/sw-update.html moves this on to watch
+   the page pick the new one up: the marker is what it reads back, and the
+   cache name is what tells the browser the worker has changed. */
+let build = 1;
+
+function stamp(path, body) {
+  const name = path.endsWith('index.html') || path.endsWith('/') ? 'index.html'
+    : path.endsWith('sw.js') ? 'sw.js' : '';
+  if (name === 'index.html') {
+    return body.toString().replace('</head>',
+      '<meta name="build" content="' + build + '">\n</head>');
+  }
+  if (name === 'sw.js') {
+    return body.toString().replace(/qr-cards-v\d+/, 'qr-cards-test-' + build);
+  }
+  return body;
+}
+
 const server = createServer(async (req, res) => {
-  if (req.method === 'POST' && req.url === '/__result') {
+  const url = req.url.split('?')[0];
+  if (req.method === 'POST' && url === '/__result') {
     const chunks = [];
     for await (const c of req) chunks.push(c);
     res.writeHead(204).end();
     settle(Buffer.concat(chunks).toString());
     return;
   }
-  const path = join(ROOT, normalize(decodeURIComponent(req.url.split('?')[0])));
+  if (req.method === 'POST' && url.startsWith('/__build/')) {
+    build = Number(url.slice('/__build/'.length)) || build;
+    res.writeHead(204).end();
+    return;
+  }
+  const path = join(ROOT, normalize(decodeURIComponent(url)));
   if (!path.startsWith(ROOT)) { res.writeHead(403).end(); return; }
   try {
     const body = await readFile(path);
-    res.writeHead(200, { 'content-type': TYPES[extname(path)] || 'application/octet-stream' });
-    res.end(body);
+    // no-store throughout, so what a test sees is what this server decided
+    // to serve and never something the browser kept from a moment ago.
+    res.writeHead(200, {
+      'content-type': TYPES[extname(path)] || 'application/octet-stream',
+      'cache-control': 'no-store'
+    });
+    res.end(stamp(path, body));
   } catch {
     res.writeHead(404).end('not found');
   }

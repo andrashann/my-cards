@@ -36,6 +36,23 @@ no address bar, and `sw.js` caches everything, so your cards still come up in a 
 This needs the folder served over HTTPS. Opened as a `file://` URL the page still works, but the
 camera is unavailable, because browsers only grant camera access to a secure origin.
 
+### Updating a published copy
+
+An installed copy runs from the service worker's cache, so a deploy reaches it through the worker
+rather than through the browser. Bump `CACHE` in `sw.js` every time you publish: changing those
+bytes is what makes the browser install the new worker, and only a new worker re-downloads the
+files. The page notices the handover and reloads itself, so the first launch after a deploy updates
+itself a moment after opening rather than showing the old version until the launch after that. It
+waits if a card, the scanner, or the editor is open, so nothing disappears while you are using it.
+Forget the bump and the update still arrives, one launch later, through the background refresh.
+
+The host's own cache header sets the floor on how soon the browser sees the new `sw.js`: ten
+minutes on GitHub Pages.
+
+Saved cards are not touched by any of this. They are in `localStorage`, which the worker never
+writes and a new worker never clears, and a reload does not disturb. Clearing the site's data or
+removing the home screen icon is what loses them, so export a backup before doing either.
+
 ## How it shows a code
 
 The code view is always white with black bars, whatever theme the rest of the page is in: a scanner
@@ -116,8 +133,8 @@ underneath it.
 node tests/run-browser-tests.mjs
 ```
 
-39 checks that need real layout, real gestures, or both, so they cannot run in node: this serves the
-project to headless Chrome and drives two harnesses against it.
+49 checks that need real layout, real gestures, or a real service worker, so they cannot run in
+node: this serves the project to headless Chrome and drives three harnesses against it.
 
 `tests/reorder-drag.html` is 24 checks on reordering: a mouse drag up and down a single column, a
 sideways drag in the two-column layout, a touch drag that holds first and a flick that does not, the
@@ -127,6 +144,12 @@ tap still opens the barcode while the tap left behind by a drop does not.
 `tests/code-view.html` is 15 checks on the full-screen barcode in a phone-shaped frame: that a 1D
 code opens flat, that **Turn** rotates it and back, that it is centered and wholly on screen either
 way, and that a QR code has no Turn button.
+
+`tests/sw-update.html` is 10 checks on what an installed copy does when a new one is published under
+it. The server stamps a build number into the page and into the worker's cache name, so moving it on
+is a deploy: the page must land on the new build by reloading itself exactly once, must then stay
+put rather than loop, must wait while a card is open and land as soon as it is put away, and must
+leave the saved cards alone throughout.
 
 Name a harness to run only that one (`node tests/run-browser-tests.mjs code-view`), or add `--show`
 for URLs to open in your own browser and watch. It expects Chrome at the usual macOS path;

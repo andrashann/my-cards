@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Code view check</title>
+<style>
+  body { font: 13px/1.5 ui-monospace, monospace; margin: 16px; }
+  iframe { width: 390px; height: 844px; border: 1px solid #ccc; }
+  pre { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>Code view check</h1>
+<pre id="out">running…</pre>
+<div id="stage"></div>
+
+<script>
+/* The full-screen barcode, in a phone-shaped frame: how the canvas is sized
+   and placed is layout, so it can only be checked in a real browser.
+   tests/run-browser-tests.mjs serves this file and reports the result. */
+(function () {
+  'use strict';
+  var KEY = 'qr-cards.v1';
+  var log = [], fails = 0;
+
+  function ok(pass, what) {
+    log.push((pass ? 'ok    ' : 'FAIL  ') + what);
+    if (!pass) fails++;
+    document.getElementById('out').textContent = log.join('\n');
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  function seed(format, payload) {
+    localStorage.setItem(KEY, JSON.stringify([{
+      id: 'c1', name: 'Example Market', label: 'Loyalty',
+      payload: payload, format: format, color: '#2a78d6'
+    }]));
+  }
+  function open() {
+    return new Promise(function (done) {
+      var f = document.createElement('iframe');
+      f.src = '../index.html';
+      f.addEventListener('load', function () { done(f); });
+      document.getElementById('stage').innerHTML = '';
+      document.getElementById('stage').appendChild(f);
+    });
+  }
+  function show(f) {
+    f.contentDocument.querySelector('.slot .tile').click();
+    return wait(80);
+  }
+  function boxes(f) {
+    var st = f.contentDocument.querySelector('.codeview .stage');
+    var cv = st.querySelector('canvas');
+    return { stage: st, st: st.getBoundingClientRect(), cv: cv.getBoundingClientRect() };
+  }
+  function centered(b) {
+    return Math.abs((b.st.left + b.st.right) / 2 - (b.cv.left + b.cv.right) / 2) < 1.5 &&
+      Math.abs((b.st.top + b.st.bottom) / 2 - (b.cv.top + b.cv.bottom) / 2) < 1.5;
+  }
+  function inside(b) {
+    return b.cv.left >= b.st.left - 1 && b.cv.right <= b.st.right + 1 &&
+      b.cv.top >= b.st.top - 1 && b.cv.bottom <= b.st.bottom + 1;
+  }
+  function round(r) {
+    return Math.round(r.width) + 'x' + Math.round(r.height) +
+      ' at ' + Math.round(r.left) + ',' + Math.round(r.top);
+  }
+
+  async function run() {
+    // --- a 1D barcode on a tall screen stays the way it is printed ---
+    seed('EAN_13', '4012345678901');
+    var f = await open();
+    await show(f);
+    var b = boxes(f);
+    ok(!b.stage.classList.contains('rot'), 'an EAN-13 opens flat, not turned');
+    ok(b.cv.width > b.cv.height, 'it is wider than it is tall, got ' + round(b.cv));
+    ok(centered(b), 'it is centered in the stage, got ' + round(b.cv) + ' in ' + round(b.st));
+    ok(inside(b), 'and none of it is off the stage, got ' + round(b.cv) + ' in ' + round(b.st));
+    var flatWidth = b.cv.width;
+
+    // --- Turn rotates it, and it is still centered ---
+    f.contentDocument.querySelector('.cv-rotate').click();
+    await wait(40);
+    b = boxes(f);
+    ok(b.stage.classList.contains('rot'), 'Turn rotates it');
+    ok(b.cv.height > b.cv.width, 'turned, it is taller than it is wide, got ' + round(b.cv));
+    ok(centered(b), 'turned, it is still centered, got ' + round(b.cv) + ' in ' + round(b.st));
+    ok(inside(b), 'turned, none of it is off the stage, got ' + round(b.cv) + ' in ' + round(b.st));
+    ok(b.cv.height > flatWidth, 'turned, the bars are longer than the flat code was wide, got ' +
+      Math.round(b.cv.height) + ' against ' + Math.round(flatWidth));
+
+    // --- and Turn again puts it back ---
+    f.contentDocument.querySelector('.cv-rotate').click();
+    await wait(40);
+    b = boxes(f);
+    ok(!b.stage.classList.contains('rot'), 'Turn again puts it back flat');
+    ok(centered(b), 'back flat, it is centered, got ' + round(b.cv) + ' in ' + round(b.st));
+
+    // --- a QR code is square, so there is nothing to turn ---
+    seed('QR_CODE', 'https://example.com/card/12345');
+    f = await open();
+    await show(f);
+    b = boxes(f);
+    ok(f.contentDocument.querySelector('.cv-rotate').hidden, 'a QR code hides the Turn button');
+    ok(!b.stage.classList.contains('rot'), 'a QR code is never turned');
+    ok(centered(b), 'a QR code is centered, got ' + round(b.cv) + ' in ' + round(b.st));
+    ok(inside(b), 'and fits the stage, got ' + round(b.cv) + ' in ' + round(b.st));
+
+    log.push(fails ? '\n' + fails + ' failing' : '\nall passing');
+    document.getElementById('out').textContent = log.join('\n');
+    try {
+      await fetch('/__result', { method: 'POST', body: log.join('\n') });
+    } catch (e) { /* opened by hand, so just read the page */ }
+  }
+
+  run().catch(function (e) {
+    log.push('FAIL  threw: ' + (e && e.message));
+    document.getElementById('out').textContent = log.join('\n');
+    try { fetch('/__result', { method: 'POST', body: log.join('\n') }); } catch (x) {}
+  });
+})();
+</script>
+</body>
+</html>

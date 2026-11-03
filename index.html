@@ -450,10 +450,21 @@ input[type=text].hexin { width: 7.5em; flex: none; }
   padding: 8px 13px; cursor: pointer; flex: none;
 }
 .codeview .cv-btn:hover { border-color: #898781; }
-.codeview .stage { flex: 1; min-height: 0; display: grid; place-items: center; overflow: hidden; padding: 6px; }
-/* Keep module edges hard when the canvas is scaled up. */
-.codeview .stage canvas { display: block; image-rendering: pixelated; }
-.codeview .stage.rot canvas { transform: rotate(90deg); }
+.codeview .stage {
+  flex: 1; min-height: 0; position: relative;
+  display: grid; place-items: center; overflow: hidden; padding: 6px;
+}
+/* Centered by absolute positioning rather than by the grid, and kept hard
+   edged when it is scaled up. A canvas turned ninety degrees is laid out
+   wider than the stage, and WebKit pins an overflowing grid item to the
+   start edge instead of centering it, which pushes half the barcode off
+   the right of the screen. */
+.codeview .stage canvas {
+  display: block; image-rendering: pixelated;
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+}
+.codeview .stage.rot canvas { transform: translate(-50%, -50%) rotate(90deg); }
 .codeview .cv-foot {
   flex: none; text-align: center; padding: 10px 16px 14px;
   display: flex; flex-direction: column; gap: 5px; align-items: center;
@@ -918,8 +929,10 @@ input[type=text].hexin { width: 7.5em; flex: none; }
     } catch (e) { wakeLock = null; }   // unsupported on most of iOS; harmless
   }
 
-  /* A 1D barcode is wider than it is tall, so on a portrait screen turning
-     it ninety degrees makes the bars substantially bigger. */
+  /* A 1D barcode is shown the way it is printed. Turning it ninety degrees
+     on a portrait screen does make the bars substantially bigger, but it is
+     not what a till expects to be handed, so that is left to the Turn
+     button. Either way the canvas is sized to fill the stage. */
   function layoutCode() {
     if (!view || !currentCard) return;
     var stage = view.querySelector('.stage');
@@ -931,7 +944,7 @@ input[type=text].hexin { width: 7.5em; flex: none; }
     var flat = Math.min(sw, sh * ar);
     var turned = Math.min(sh, sw * ar);
     var canTurn = C.FORMATS[currentCard.format].shape === 'wide';
-    var turn = userRotate === null ? (canTurn && turned > flat * 1.12) : (canTurn && userRotate);
+    var turn = canTurn && userRotate === true;
     var w = turn ? turned : flat;
     cv.style.width = Math.floor(w) + 'px';
     cv.style.height = Math.floor(w / ar) + 'px';

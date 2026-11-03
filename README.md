@@ -39,10 +39,11 @@ camera is unavailable, because browsers only grant camera access to a secure ori
 ## How it shows a code
 
 The code view is always white with black bars, whatever theme the rest of the page is in: a scanner
-reads reflectance, so a dark card would simply not scan. A 1D barcode is wider than it is tall, so on
-a portrait screen it is turned ninety degrees, which makes the bars substantially bigger; **Turn**
-overrides that. The page also asks for a screen wake lock, which most iOS versions decline, so it
-may still dim.
+reads reflectance, so a dark card would simply not scan. A 1D barcode is shown the way it is
+printed, as wide as the screen allows, which is the orientation a till expects. **Turn** rotates it
+ninety degrees instead: on a portrait screen that makes the bars a good deal longer, which helps a
+scanner that is struggling. The page also asks for a screen wake lock, which most iOS versions
+decline, so it may still dim.
 
 ## Barcode formats
 
@@ -65,7 +66,7 @@ sw.js                      offline cache
 manifest.webmanifest       so it installs to a home screen
 icon.svg                   app icon
 vendor/                    pinned libraries, no CDN
-tests/                     node tests for lib/codes.js, and a browser test for reordering
+tests/                     node tests for lib/codes.js, and browser tests for the page
 ```
 
 ### Libraries
@@ -112,13 +113,21 @@ reaches 4.42:1, which clears the 3:1 bar for a card name but not the 4.5:1 bar f
 underneath it.
 
 ```sh
-node tests/run-reorder-drag.mjs
+node tests/run-browser-tests.mjs
 ```
 
-24 checks on reordering, which needs real layout and real pointer events, so it serves the page to
-headless Chrome and drives `tests/reorder-drag.html` against it. It covers a mouse drag up and down
-a single column, a sideways drag in the two-column layout, a touch drag that holds first and a flick
-that does not, the saved order, Escape mid-drag, the keyboard move with its focus and announcement,
-and that a plain tap still opens the barcode while the tap left behind by a drop does not. Add
-`--show` to open the same harness in your own browser and watch it. It expects Chrome at the usual
-macOS path; `CHROME=/path/to/chrome` overrides that.
+39 checks that need real layout, real gestures, or both, so they cannot run in node: this serves the
+project to headless Chrome and drives two harnesses against it.
+
+`tests/reorder-drag.html` is 24 checks on reordering: a mouse drag up and down a single column, a
+sideways drag in the two-column layout, a touch drag that holds first and a flick that does not, the
+saved order, Escape mid-drag, the keyboard move with its focus and announcement, and that a plain
+tap still opens the barcode while the tap left behind by a drop does not.
+
+`tests/code-view.html` is 15 checks on the full-screen barcode in a phone-shaped frame: that a 1D
+code opens flat, that **Turn** rotates it and back, that it is centered and wholly on screen either
+way, and that a QR code has no Turn button.
+
+Name a harness to run only that one (`node tests/run-browser-tests.mjs code-view`), or add `--show`
+for URLs to open in your own browser and watch. It expects Chrome at the usual macOS path;
+`CHROME=/path/to/chrome` overrides that.

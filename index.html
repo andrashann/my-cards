@@ -1591,21 +1591,37 @@ input[type=text].hexin { width: 7.5em; flex: none; }
     persist(); render();
   });
 
-  // An apple-touch-icon so Add to Home Screen gets a real tile, drawn here
-  // rather than shipped as a second binary file.
+  /* An apple-touch-icon so Add to Home Screen gets a real tile, drawn here
+     rather than shipped as a second binary file. iOS ignores the SVG in the
+     manifest, so this is the icon people actually end up with, and it is
+     icon.svg's own 192-unit geometry scaled to 180 so the two are one mark:
+     the left edge of the first bar and the left edge of the rule line up,
+     and so do their right edges. */
   (function appleIcon() {
     try {
-      var s = 180, cv = document.createElement('canvas');
+      var s = 180, k = s / 192;
+      var cv = document.createElement('canvas');
       cv.width = cv.height = s;
       var cx = cv.getContext('2d');
-      cx.fillStyle = '#2a78d6'; cx.fillRect(0, 0, s, s);
+      cx.fillStyle = '#2a78d6';
+      cx.fillRect(0, 0, s, s);
       cx.fillStyle = '#ffffff';
-      var bars = [7, 4, 11, 4, 7, 4, 9, 4, 10], x = 44, y = 52, h = 72;
-      for (var i = 0; i < bars.length && x < s - 40; i++) {
-        if (i % 2 === 0) cx.fillRect(x, y, bars[i], h);
-        x += bars[i];
+      // Each bar as it is in icon.svg: where it starts, and how wide it is.
+      var bars = [[46, 7], [58, 4], [67, 11], [83, 4], [92, 7],
+                  [104, 4], [113, 9], [127, 4], [136, 10]];
+      for (var i = 0; i < bars.length; i++) {
+        cx.fillRect(bars[i][0] * k, 54 * k, bars[i][1] * k, 68 * k);
       }
-      cx.fillRect(44, y + h + 13, s - 88, 9);
+      // The rule under them is a pill in icon.svg, and roundRect is newer
+      // than the Safari versions this has to draw on, so it is two round
+      // caps and the bar between them.
+      var rx = 46 * k, ry = 133 * k, rw = 100 * k, rr = 4.5 * k;
+      cx.beginPath();
+      cx.arc(rx + rr, ry + rr, rr, 0, Math.PI * 2);
+      cx.arc(rx + rw - rr, ry + rr, rr, 0, Math.PI * 2);
+      cx.fill();
+      cx.fillRect(rx + rr, ry, rw - rr * 2, 9 * k);
+
       var link = document.createElement('link');
       link.rel = 'apple-touch-icon';
       link.href = cv.toDataURL('image/png');

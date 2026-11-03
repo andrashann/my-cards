@@ -133,8 +133,9 @@ underneath it.
 node tests/run-browser-tests.mjs
 ```
 
-49 checks that need real layout, real gestures, or a real service worker, so they cannot run in
-node: this serves the project to headless Chrome and drives three harnesses against it.
+60 checks that need real layout, real gestures, a real service worker, or real pixels, so they
+cannot run in node: this serves the project to headless Chrome and drives four harnesses against
+it.
 
 `tests/reorder-drag.html` is 24 checks on reordering: a mouse drag up and down a single column, a
 sideways drag in the two-column layout, a touch drag that holds first and a flick that does not, the
@@ -150,6 +151,12 @@ it. The server stamps a build number into the page and into the worker's cache n
 is a deploy: the page must land on the new build by reloading itself exactly once, must then stay
 put rather than loop, must wait while a card is open and land as soon as it is put away, and must
 leave the saved cards alone throughout.
+
+`tests/icon.html` is 11 checks on the home screen icon. iOS ignores the SVG in the manifest and
+takes the `apple-touch-icon`, which the page draws on a canvas, so the two can drift apart without
+anyone noticing until it is on a phone. It reads the rectangles out of `icon.svg`, measures the
+drawn PNG pixel by pixel, and requires nine bars in the places the file puts them, a rule flush
+with the first and last of them, and the whole mark centered in the tile.
 
 Name a harness to run only that one (`node tests/run-browser-tests.mjs code-view`), or add `--show`
 for URLs to open in your own browser and watch. It expects Chrome at the usual macOS path;

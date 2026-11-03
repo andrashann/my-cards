@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Icon check</title>
+<style>
+  body { font: 13px/1.5 ui-monospace, monospace; margin: 16px; }
+  pre { white-space: pre-wrap; }
+  iframe { display: none; }
+  canvas { border: 1px solid #ccc; margin-right: 12px; }
+</style>
+</head>
+<body>
+<h1>Icon check</h1>
+<pre id="out">running…</pre>
+<div><canvas id="shown" width="180" height="180"></canvas></div>
+
+<script>
+/* The home screen icon. iOS ignores the manifest's SVG and takes the
+   apple-touch-icon, which index.html draws on a canvas, so the two can drift
+   apart without anyone noticing until it is on a phone. This measures the
+   drawn one against the geometry in icon.svg.
+   tests/run-browser-tests.mjs serves this file and reports the result. */
+(function () {
+  'use strict';
+  var log = [], fails = 0, SIZE = 180, K = SIZE / 192;
+
+  function ok(pass, what) {
+    log.push((pass ? 'ok    ' : 'FAIL  ') + what);
+    if (!pass) fails++;
+    document.getElementById('out').textContent = log.join('\n');
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  function load(src, el) {
+    return new Promise(function (res, rej) {
+      el.addEventListener('load', function () { res(el); });
+      el.addEventListener('error', function () { rej(new Error('could not load ' + src)); });
+      el.src = src;
+    });
+  }
+
+  /* Every <rect> in icon.svg, as {x, y, w, h}. */
+  async function svgRects() {
+    var text = await (await fetch('../icon.svg')).text();
+    var out = [], m, re = /<rect([^>]*)\/>/g;
+    function attr(s, name) {
+      var a = new RegExp(name + '="([\\d.]+)"').exec(s);
+      return a ? Number(a[1]) : 0;
+    }
+    while ((m = re.exec(text))) {
+      out.push({ x: attr(m[1], 'x'), y: attr(m[1], 'y'), w: attr(m[1], 'width'), h: attr(m[1], 'height') });
+    }
+    return out;
+  }
+
+  /* The runs of white along one row of the drawn icon, in icon.svg's units. */
+  function runs(data, y) {
+    var out = [], on = false, start = 0;
+    for (var x = 0; x < SIZE; x++) {
+      var i = (y * SIZE + x) * 4;
+      var white = data[i] > 128 && data[i + 1] > 128 && data[i + 2] > 128;
+      if (white && !on) { on = true; start = x; }
+      if (!white && on) { on = false; out.push({ from: start / K, to: x / K }); }
+    }
+    if (on) out.push({ from: start / K, to: SIZE / K });
+    return out;
+  }
+  function near(a, b) { return Math.abs(a - b) <= 1.6; }
+
+  async function run() {
+    var rects = await svgRects();
+    var bg = rects.filter(function (r) { return r.w === 192; })[0];
+    var bars = rects.filter(function (r) { return r.h > 20 && r.w < 50; });
+    var rule = rects.filter(function (r) { return r.w === 100; })[0];
+    ok(!!bg && bars.length === 9 && !!rule,
+      'icon.svg reads as a background, nine bars, and a rule, got ' + rects.length + ' rects');
+
+    // --- the icon the page hands to iOS ---
+    var f = document.createElement('iframe');
+    document.body.appendChild(f);
+    await load('../index.html', f);
+    await wait(120);
+    var link = f.contentDocument.querySelector('link[rel=apple-touch-icon]');
+    ok(!!link, 'the page adds an apple-touch-icon');
+    ok(link && link.href.indexOf('data:image/png') === 0, 'as a PNG data URL');
+
+    var img = await load(link.href, new Image());
+    ok(img.naturalWidth === SIZE && img.naturalHeight === SIZE,
+      'drawn at ' + SIZE + ' square, got ' + img.naturalWidth + 'x' + img.naturalHeight);
+
+    var cv = document.getElementById('shown');
+    var cx = cv.getContext('2d');
+    cx.drawImage(img, 0, 0);
+    var px = cx.getImageData(0, 0, SIZE, SIZE).data;
+
+    // --- the background fills the tile, since iOS masks it to a squircle ---
+    var corner = [px[0], px[1], px[2]];
+    ok(corner[0] === 0x2a && corner[1] === 0x78 && corner[2] === 0xd6,
+      'the corner is the card blue, got rgb(' + corner.join(',') + ')');
+
+    // --- the bars are the ones in icon.svg ---
+    var mid = Math.round((bars[0].y + bars[0].h / 2) * K);
+    var got = runs(px, mid);
+    ok(got.length === bars.length,
+      'nine bars are drawn, got ' + got.length);
+    var off = [];
+    bars.forEach(function (b, i) {
+      if (!got[i] || !near(got[i].from, b.x) || !near(got[i].to, b.x + b.w)) {
+        off.push(i + ': want ' + b.x + '-' + (b.x + b.w) +
+          ', got ' + (got[i] ? Math.round(got[i].from) + '-' + Math.round(got[i].to) : 'nothing'));
+      }
+    });
+    ok(!off.length, 'each one where icon.svg puts it' + (off.length ? ', off by [' + off.join('; ') + ']' : ''));
+
+    // --- and the rule under them matches, which is what went wrong before ---
+    var ruleRow = Math.round((rule.y + rule.h / 2) * K);
+    var rr = runs(px, ruleRow);
+    ok(rr.length === 1, 'the rule is one unbroken line, got ' +
+      (rr.length === 1 ? 'one run' : rr.length + ' runs'));
+    ok(rr.length === 1 && near(rr[0].from, rule.x) && near(rr[0].to, rule.x + rule.w),
+      'as wide as icon.svg draws it, want ' + rule.x + '-' + (rule.x + rule.w) +
+      ', got ' + (rr.length ? Math.round(rr[0].from) + '-' + Math.round(rr[0].to) : 'nothing'));
+    ok(rr.length === 1 && got.length && near(rr[0].from, got[0].from) &&
+      near(rr[0].to, got[got.length - 1].to),
+      'and flush with the first and last bar, bars ' +
+      (got.length ? Math.round(got[0].from) + '-' + Math.round(got[got.length - 1].to) : '?') +
+      ', rule ' + (rr.length ? Math.round(rr[0].from) + '-' + Math.round(rr[0].to) : '?'));
+
+    // --- centered, so the squircle crop takes the same off each side ---
+    ok(rr.length === 1 && near(rr[0].from, 192 - rr[0].to),
+      'the mark is centered in the tile, ' + (rr.length ? Math.round(rr[0].from) + ' left against ' +
+      Math.round(192 - rr[0].to) + ' right' : '?'));
+
+    log.push(fails ? '\n' + fails + ' failing' : '\nall passing');
+    document.getElementById('out').textContent = log.join('\n');
+    try {
+      await fetch('/__result', { method: 'POST', body: log.join('\n') });
+    } catch (e) { /* opened by hand, so just read the page */ }
+  }
+
+  run().catch(function (e) {
+    log.push('FAIL  threw: ' + (e && e.message));
+    document.getElementById('out').textContent = log.join('\n');
+    try { fetch('/__result', { method: 'POST', body: log.join('\n') }); } catch (x) {}
+  });
+})();
+</script>
+</body>
+</html>

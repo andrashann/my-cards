@@ -11,7 +11,7 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
-const PAGES = ['reorder-drag.html', 'code-view.html', 'sw-update.html'];
+const PAGES = ['reorder-drag.html', 'code-view.html', 'sw-update.html', 'icon.html'];
 const args = process.argv.slice(2).filter((a) => a !== '--show');
 const SHOW = process.argv.includes('--show');
 const pages = args.length

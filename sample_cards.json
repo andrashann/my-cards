@@ -1,0 +1,70 @@
+{
+  "format": "qr-cards.v1",
+  "exported": "2026-11-04T00:00:00.000Z",
+  "cards": [
+    {
+      "id": "sample-greenfield",
+      "name": "Greenfield Market",
+      "label": "Loyalty",
+      "payload": "5901234567893",
+      "format": "EAN_13",
+      "color": "#2a78d6"
+    },
+    {
+      "id": "sample-northside",
+      "name": "Northside Pharmacy",
+      "label": "Points",
+      "payload": "NSP4472-8810",
+      "format": "CODE_128",
+      "color": "#eb6834"
+    },
+    {
+      "id": "sample-library",
+      "name": "City Library",
+      "label": "Member",
+      "payload": "A2983471B",
+      "format": "CODABAR",
+      "color": "#1baf7a"
+    },
+    {
+      "id": "sample-rivera",
+      "name": "Rivera Coffee",
+      "label": "Stamps",
+      "payload": "https://example.com/stamp/9f3c2a",
+      "format": "QR_CODE",
+      "color": "#e87ba4"
+    },
+    {
+      "id": "sample-summit",
+      "name": "Summit Gym",
+      "label": "Membership",
+      "payload": "SG-884 1207",
+      "format": "CODE_39",
+      "color": "#4a3aa7"
+    },
+    {
+      "id": "sample-parking",
+      "name": "Harbor Parking",
+      "label": "",
+      "payload": "30712845",
+      "format": "ITF",
+      "color": "#565c66"
+    },
+    {
+      "id": "sample-transit",
+      "name": "Blue Line Transit",
+      "label": "Travel",
+      "payload": "8400001123586",
+      "format": "EAN_13",
+      "color": "#008300"
+    },
+    {
+      "id": "sample-vantage",
+      "name": "Vantage Hotels",
+      "label": "Rewards",
+      "payload": "VH 9920 0417 73",
+      "format": "CODE_128",
+      "color": "#eda100"
+    }
+  ]
+}

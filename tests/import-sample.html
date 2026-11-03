@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sample import check</title>
+<style>
+  body { font: 13px/1.5 ui-monospace, monospace; margin: 16px; }
+  iframe { width: 420px; height: 900px; border: 1px solid #ccc; }
+  pre { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>Sample import check</h1>
+<pre id="out">running…</pre>
+<div id="stage"></div>
+
+<script>
+/* sample_cards.json, put through the page's own Import backup button rather
+   than read and trusted. A sample file that no longer imports is worse than
+   none at all, since it is the first thing anyone tries.
+   tests/run-browser-tests.mjs serves this file and reports the result. */
+(function () {
+  'use strict';
+  var KEY = 'qr-cards.v1';
+  var log = [], fails = 0;
+
+  function ok(pass, what) {
+    log.push((pass ? 'ok    ' : 'FAIL  ') + what);
+    if (!pass) fails++;
+    document.getElementById('out').textContent = log.join('\n');
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  function open() {
+    return new Promise(function (done) {
+      var f = document.createElement('iframe');
+      f.src = '../index.html';
+      f.addEventListener('load', function () { done(f); });
+      document.getElementById('stage').innerHTML = '';
+      document.getElementById('stage').appendChild(f);
+    });
+  }
+  /* Hand the file to the input the Import backup button covers. */
+  async function importInto(f, text) {
+    var w = f.contentWindow;
+    var input = f.contentDocument.getElementById('f-import');
+    var dt = new w.DataTransfer();
+    dt.items.add(new w.File([text], 'sample_cards.json', { type: 'application/json' }));
+    input.files = dt.files;
+    input.dispatchEvent(new w.Event('change', { bubbles: true }));
+    await wait(200);
+  }
+  function names(f) {
+    return Array.prototype.map.call(f.contentDocument.querySelectorAll('.slot .t-name'),
+      function (e) { return e.textContent; });
+  }
+
+  async function run() {
+    var text = await (await fetch('../sample_cards.json')).text();
+    var data = JSON.parse(text);
+    ok(data.format === 'qr-cards.v1', 'the file says it is a qr-cards.v1 backup, got ' + data.format);
+    ok(data.cards.length >= 5, 'it holds at least five cards, got ' + data.cards.length);
+
+    localStorage.removeItem(KEY);
+    var f = await open();
+    ok(f.contentDocument.querySelectorAll('.slot').length === 0, 'the list starts empty');
+
+    // --- the import itself ---
+    await importInto(f, text);
+    var slots = f.contentDocument.querySelectorAll('.slot');
+    ok(slots.length === data.cards.length,
+      'every card is imported, got ' + slots.length + ' of ' + data.cards.length);
+    var flash = f.contentDocument.getElementById('flash').textContent.trim();
+    ok(flash.indexOf('Imported ' + data.cards.length + ' new cards') === 0,
+      'and the page says so, got "' + flash + '"');
+    ok(names(f).join('|') === data.cards.map(function (c) { return c.name; }).join('|'),
+      'in the order the file lists them, got ' + names(f).join(', '));
+
+    // --- nothing was quietly substituted on the way in ---
+    var saved = JSON.parse(localStorage.getItem(KEY) || '[]');
+    var changed = saved.filter(function (c, i) {
+      return c.format !== data.cards[i].format || c.payload !== data.cards[i].payload ||
+        c.color !== data.cards[i].color || c.label !== data.cards[i].label;
+    });
+    ok(!changed.length, 'each one keeps its type, number, label, and color' +
+      (changed.length ? ', but ' + changed.map(function (c) { return c.name; }).join(', ') + ' did not' : ''));
+
+    // --- and every one of them actually draws ---
+    var C = f.contentWindow.CODES, undrawable = [];
+    data.cards.forEach(function (c) {
+      try {
+        var cv = C.draw(c.format, c.payload, { height: 60, width: 2, targetPx: 200 });
+        if (!cv || !cv.width) undrawable.push(c.name + ' (empty canvas)');
+      } catch (e) { undrawable.push(c.name + ': ' + e.message); }
+    });
+    ok(!undrawable.length, 'every card draws a barcode' +
+      (undrawable.length ? ', except ' + undrawable.join('; ') : ''));
+
+    var kinds = {};
+    data.cards.forEach(function (c) { kinds[c.format] = 1; });
+    ok(Object.keys(kinds).length === Object.keys(C.FORMATS).length,
+      'the sample covers all ' + Object.keys(C.FORMATS).length + ' drawable formats, got ' +
+      Object.keys(kinds).sort().join(', '));
+
+    // --- importing it twice does not double the list ---
+    await importInto(f, text);
+    ok(f.contentDocument.querySelectorAll('.slot').length === data.cards.length,
+      'importing it again replaces rather than duplicates, got ' +
+      f.contentDocument.querySelectorAll('.slot').length);
+    ok(f.contentDocument.getElementById('flash').textContent.indexOf('updated ' + data.cards.length) > 0,
+      'and says it updated them, got "' + f.contentDocument.getElementById('flash').textContent.trim() + '"');
+
+    // --- a card from the sample opens at the till ---
+    f.contentDocument.querySelector('.slot .tile').click();
+    await wait(80);
+    ok(!!f.contentDocument.querySelector('.codeview canvas'), 'tapping one shows its barcode');
+
+    log.push(fails ? '\n' + fails + ' failing' : '\nall passing');
+    document.getElementById('out').textContent = log.join('\n');
+    try {
+      await fetch('/__result', { method: 'POST', body: log.join('\n') });
+    } catch (e) { /* opened by hand, so just read the page */ }
+  }
+
+  run().catch(function (e) {
+    log.push('FAIL  threw: ' + (e && e.message));
+    document.getElementById('out').textContent = log.join('\n');
+    try { fetch('/__result', { method: 'POST', body: log.join('\n') }); } catch (x) {}
+  });
+})();
+</script>
+</body>
+</html>

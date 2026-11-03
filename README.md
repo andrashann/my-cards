@@ -28,6 +28,12 @@ Cards are kept in this browser's `localStorage`. They are not synced anywhere, w
 but it also means clearing site data wipes them, so there is an export button and an import button
 beside it.
 
+`sample_cards.json` holds eight made-up cards, one of every format the page can draw, with a
+different color each. Import it to see what a full list looks like before putting your own cards in.
+The names and numbers are invented, so none of them will scan at a till. Importing it again later
+replaces those eight rather than adding another eight, and deleting them one by one leaves whatever
+else you have added alone.
+
 ### On a phone
 
 Open it in Safari, then Share and **Add to Home Screen**. You get an icon that opens full screen with
@@ -82,6 +88,7 @@ lib/codes.js               formats, validation, drawing, reading, color
 sw.js                      offline cache
 manifest.webmanifest       so it installs to a home screen
 icon.svg                   app icon
+sample_cards.json          eight made-up cards, for the import button
 vendor/                    pinned libraries, no CDN
 tests/                     node tests for lib/codes.js, and browser tests for the page
 ```
@@ -133,8 +140,8 @@ underneath it.
 node tests/run-browser-tests.mjs
 ```
 
-60 checks that need real layout, real gestures, a real service worker, or real pixels, so they
-cannot run in node: this serves the project to headless Chrome and drives four harnesses against
+72 checks that need real layout, real gestures, a real service worker, or real pixels, so they
+cannot run in node: this serves the project to headless Chrome and drives five harnesses against
 it.
 
 `tests/reorder-drag.html` is 24 checks on reordering: a mouse drag up and down a single column, a
@@ -157,6 +164,11 @@ takes the `apple-touch-icon`, which the page draws on a canvas, so the two can d
 anyone noticing until it is on a phone. It reads the rectangles out of `icon.svg`, measures the
 drawn PNG pixel by pixel, and requires nine bars in the places the file puts them, a rule flush
 with the first and last of them, and the whole mark centered in the tile.
+
+`tests/import-sample.html` is 12 checks that put `sample_cards.json` through the page's own Import
+backup button rather than reading it and trusting it: every card arrives, in order, keeping its
+type, number, label, and color, every one of them draws, the eight between them cover all six
+drawable formats, and importing the file twice replaces rather than duplicates.
 
 Name a harness to run only that one (`node tests/run-browser-tests.mjs code-view`), or add `--show`
 for URLs to open in your own browser and watch. It expects Chrome at the usual macOS path;

@@ -1,0 +1,1331 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Cards</title>
+<meta name="description" content="Keep loyalty card barcodes on your phone and show them full screen at the till. Scan them with the camera. No account, no app, no server.">
+<meta name="color-scheme" content="light dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="My Cards">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16161a" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+
+<style>
+/* Fonts are served from this origin, so the page makes no third-party
+   request at all and renders the same with no network. The latin-ext
+   subset is included because Hungarian needs ő and ű, which latin alone
+   does not carry; without it those two letters would silently fall back to
+   another font mid-word. */
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('vendor/fonts/instrument-sans-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('vendor/fonts/instrument-sans-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('vendor/fonts/ibm-plex-mono-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('vendor/fonts/ibm-plex-mono-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Layout: a list of card tiles under a sticky bar, an editor that slides up
+   as a sheet, a black camera scanner, and a full-screen white code view that
+   ignores the page theme because scanners need white behind black bars. */
+:root {
+  --surface: #fcfcfb;
+  --panel: #ffffff;
+  --sunken: #f4f3ef;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --ink-3: #898781;
+  --line: #e1e0d9;
+  --line-2: #c3c2b7;
+  --accent: #2a78d6;
+  --accent-ink: #ffffff;
+  --accent-soft: #e9f1fc;
+  --good: #008300;
+  --bad: #d03b3b;
+  --warn: #eda100;
+  --shadow: 0 1px 2px rgba(11, 11, 11, .05), 0 10px 26px -14px rgba(11, 11, 11, .2);
+  --sheet-shadow: 0 -4px 40px rgba(11, 11, 11, .22);
+  --font-ui: "Instrument Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface: #16161a;
+    --panel: #1e1e23;
+    --sunken: #26262c;
+    --ink: #f3f2ef;
+    --ink-2: #b2b1ab;
+    --ink-3: #85847f;
+    --line: #2f2f36;
+    --line-2: #43434c;
+    --accent: #62a2f2;
+    --accent-ink: #0a1726;
+    --accent-soft: #1b2635;
+    --good: #52b86a;
+    --bad: #ef6a63;
+    --warn: #e0ab3c;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 26px -14px rgba(0, 0, 0, .75);
+    --sheet-shadow: 0 -4px 40px rgba(0, 0, 0, .7);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --surface: #16161a;
+  --panel: #1e1e23;
+  --sunken: #26262c;
+  --ink: #f3f2ef;
+  --ink-2: #b2b1ab;
+  --ink-3: #85847f;
+  --line: #2f2f36;
+  --line-2: #43434c;
+  --accent: #62a2f2;
+  --accent-ink: #0a1726;
+  --accent-soft: #1b2635;
+  --good: #52b86a;
+  --bad: #ef6a63;
+  --warn: #e0ab3c;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 26px -14px rgba(0, 0, 0, .75);
+  --sheet-shadow: 0 -4px 40px rgba(0, 0, 0, .7);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+html { height: 100%; }
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font-family: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------------- sticky bar ---------------- */
+.bar {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--line);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.bar .inner {
+  max-width: 640px; margin: 0 auto;
+  display: flex; align-items: center; gap: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px;
+}
+.bar h1 { font-size: 21px; font-weight: 700; letter-spacing: -.02em; margin: 0; flex: 1; min-width: 0; }
+.barbtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line-2); background: var(--panel); color: var(--ink);
+  border-radius: 999px; font-size: 14px; font-weight: 500; padding: 8px 14px; cursor: pointer;
+}
+.barbtn:hover { border-color: var(--ink-3); }
+.barbtn.go { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.barbtn.go:hover { filter: brightness(1.07); border-color: var(--accent); }
+.barbtn svg { width: 16px; height: 16px; flex: none; }
+
+main {
+  max-width: 640px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px calc(32px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ---------------- card tiles ---------------- */
+.cards { display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 560px) { .cards { grid-template-columns: 1fr 1fr; } }
+.slot { position: relative; }
+.tile {
+  position: relative; width: 100%; text-align: left;
+  border: none; border-radius: 14px; padding: 15px 16px 14px;
+  cursor: pointer; overflow: hidden; box-shadow: var(--shadow);
+  min-height: 112px;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 14px;
+}
+/* A faint bar pattern, so a tile reads as a card with a code on it. */
+.tile::after {
+  content: ""; position: absolute; right: -6px; bottom: -8px;
+  width: 128px; height: 58px; opacity: .17; pointer-events: none;
+  background-image: repeating-linear-gradient(90deg,
+    currentColor 0 3px, transparent 3px 6px, currentColor 6px 8px, transparent 8px 13px,
+    currentColor 13px 15px, transparent 15px 19px, currentColor 19px 24px, transparent 24px 27px);
+  mask-image: linear-gradient(90deg, transparent, #000 35%);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 35%);
+}
+.tile .t-name {
+  font-size: 17px; font-weight: 600; letter-spacing: -.015em; line-height: 1.2;
+  word-break: break-word; position: relative; z-index: 1;
+}
+.tile .t-label {
+  font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
+  margin-bottom: 3px; position: relative; z-index: 1;
+}
+.tile .t-foot {
+  display: flex; align-items: baseline; gap: 8px; position: relative; z-index: 1;
+  font-family: var(--font-mono); font-size: 12px;
+}
+.tile .t-num { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.tile .t-fmt { flex: none; font-size: 10.5px; }
+.tile-edit {
+  position: absolute; top: 7px; right: 7px; z-index: 2;
+  width: 32px; height: 32px; border-radius: 8px; border: none;
+  background: transparent; color: inherit; cursor: pointer;
+  font-size: 15px; line-height: 1; opacity: .75;
+}
+.tile-edit:hover { opacity: 1; background: rgba(255, 255, 255, .2); }
+
+/* ---------------- empty state ---------------- */
+.empty {
+  border: 1.5px dashed var(--line-2); border-radius: 14px;
+  background: var(--sunken); padding: 30px 22px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.empty h2 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.015em; }
+.empty p { margin: 0; color: var(--ink-2); font-size: 13.5px; max-width: 44ch; }
+.empty .btns { display: flex; gap: 9px; flex-wrap: wrap; justify-content: center; margin-top: 3px; }
+
+/* ---------------- generic controls ---------------- */
+.btn {
+  border-radius: 8px; border: 1px solid var(--line-2);
+  background: var(--panel); color: var(--ink);
+  font-size: 14px; font-weight: 500; padding: 9px 15px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px; justify-content: center;
+}
+.btn:hover:not(:disabled) { border-color: var(--ink-3); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.go { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.go:hover:not(:disabled) { filter: brightness(1.07); }
+.btn.danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--line-2)); }
+.btn.small { font-size: 12.5px; padding: 6px 11px; }
+.btn.wide { width: 100%; padding: 12px 15px; font-size: 15px; }
+.btn svg { width: 17px; height: 17px; flex: none; }
+
+/* Not label.fld: the color group holds several controls, and a label may
+   only wrap one. */
+.fld { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.fld > span {
+  font-size: 11px; font-weight: 600; letter-spacing: .055em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+input[type=text], textarea, select {
+  font-family: var(--font-ui); font-size: 16px; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line-2);
+  border-radius: 8px; padding: 10px 11px; width: 100%; min-width: 0;
+}
+textarea { resize: vertical; min-height: 52px; line-height: 1.45; }
+.mono, input.mono, textarea.mono { font-family: var(--font-mono); }
+.row2 { display: grid; gap: 11px; grid-template-columns: 1fr 1fr; }
+@media (max-width: 460px) { .row2 { grid-template-columns: 1fr; } }
+
+.note { font-size: 13px; line-height: 1.5; border-radius: 8px; padding: 9px 11px; border: 1px solid; }
+.note.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); background: color-mix(in srgb, var(--bad) 7%, transparent); }
+.note.warn { color: var(--ink); border-color: color-mix(in srgb, var(--warn) 55%, transparent); background: color-mix(in srgb, var(--warn) 11%, transparent); }
+.note.ok { color: var(--ink-2); border-color: var(--line); background: var(--sunken); }
+.note b { color: var(--ink); }
+.note .found { display: flex; gap: 10px; align-items: center; margin-top: 7px; }
+.note .found img {
+  height: 44px; max-width: 150px; background: #fff; border-radius: 4px;
+  padding: 3px; border: 1px solid var(--line-2); object-fit: contain;
+}
+.spin {
+  display: inline-block; width: 12px; height: 12px; vertical-align: -1px;
+  border: 2px solid var(--line-2); border-top-color: var(--accent);
+  border-radius: 50%; animation: sp .7s linear infinite;
+}
+@keyframes sp { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } }
+
+/* ---------------- footer ---------------- */
+footer {
+  margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 12px;
+  font-size: 12.5px; color: var(--ink-3);
+}
+footer p { margin: 0; max-width: 64ch; }
+footer a { color: var(--accent); }
+footer b { color: var(--ink-2); }
+footer .acts { display: flex; gap: 9px; flex-wrap: wrap; }
+footer code { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2); }
+
+/* ---------------- editor sheet ---------------- */
+.scrim {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(11, 11, 11, .45);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+@media (min-width: 620px) { .scrim { align-items: center; } }
+.sheet {
+  background: var(--surface); width: 100%; max-width: 560px;
+  border-radius: 16px 16px 0 0;
+  max-height: 92vh; overflow-y: auto;
+  box-shadow: var(--sheet-shadow);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 14px;
+}
+@media (min-width: 620px) { .sheet { border-radius: 16px; } }
+.sheet h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
+.sheet hr { border: none; border-top: 1px solid var(--line); margin: 2px 0; }
+.sheet .or {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 11px; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.sheet .or::before, .sheet .or::after {
+  content: ""; flex: 1; height: 1px; background: var(--line);
+}
+.grabbers { display: flex; flex-direction: column; gap: 9px; }
+.sws { display: flex; flex-wrap: wrap; gap: 8px; }
+.sw { width: 36px; height: 36px; border-radius: 9px; border: 1px solid rgba(0, 0, 0, .18); cursor: pointer; padding: 0; }
+.sw[aria-pressed=true] { box-shadow: inset 0 0 0 2.5px var(--surface), 0 0 0 2px var(--ink); }
+.customrow { display: flex; gap: 8px; align-items: center; }
+input[type=color].sw-custom {
+  width: 36px; height: 36px; flex: none; padding: 0; cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, .18); border-radius: 9px; background: var(--panel);
+}
+/* Selected only while the color is not one of the swatches above. */
+input[type=color].sw-custom.on { box-shadow: inset 0 0 0 2.5px var(--surface), 0 0 0 2px var(--ink); }
+input[type=color].sw-custom::-webkit-color-swatch-wrapper { padding: 0; }
+input[type=color].sw-custom::-webkit-color-swatch { border: none; border-radius: 7px; }
+input[type=text].hexin { width: 7.5em; flex: none; }
+.customrow .hint { font-size: 12px; color: var(--ink-3); min-width: 0; }
+.sheet .acts { display: flex; gap: 9px; align-items: center; }
+.sheet .acts .grow { flex: 1; }
+.minibox {
+  background: #fff; border: 1px solid var(--line-2); border-radius: 8px;
+  padding: 8px; display: grid; place-items: center; min-height: 74px;
+}
+.minibox canvas { display: block; max-width: 100%; height: auto; max-height: 96px; width: auto; image-rendering: pixelated; }
+.minibox .ph { color: #898781; font-size: 12px; text-align: center; padding: 6px; }
+.filepick { position: relative; overflow: hidden; }
+.filepick input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+
+/* ---------------- camera scanner ---------------- */
+.scanner {
+  position: fixed; inset: 0; z-index: 70;
+  background: #000; color: #fff;
+  display: flex; flex-direction: column;
+  user-select: none; -webkit-user-select: none;
+}
+.scanner video {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; background: #000;
+}
+.scanner .sc-mask {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 86%; max-width: 560px; aspect-ratio: 5 / 3;
+  border-radius: 14px;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .55);
+  pointer-events: none;
+}
+/* Corner ticks rather than a full frame, so nothing sits over the code. */
+.scanner .sc-mask::before, .scanner .sc-mask::after {
+  content: ""; position: absolute; width: 34px; height: 34px;
+  border: 3px solid rgba(255, 255, 255, .92);
+}
+.scanner .sc-mask::before { top: -1px; left: -1px; border-right: none; border-bottom: none; border-radius: 14px 0 0 0; }
+.scanner .sc-mask::after { bottom: -1px; right: -1px; border-left: none; border-top: none; border-radius: 0 0 14px 0; }
+.scanner .sc-top {
+  position: relative; z-index: 2; display: flex; align-items: center; gap: 10px;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  padding-left: max(12px, env(safe-area-inset-left, 0px));
+  padding-right: max(12px, env(safe-area-inset-right, 0px));
+  padding-bottom: 10px;
+  background: linear-gradient(rgba(0, 0, 0, .55), transparent);
+}
+.scanner .sc-title {
+  flex: 1; min-width: 0; text-align: center; font-size: 15px; font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .6);
+}
+.scanner .sc-btn {
+  border: 1px solid rgba(255, 255, 255, .45); background: rgba(0, 0, 0, .35);
+  color: #fff; border-radius: 8px; font-size: 14px; font-weight: 500;
+  padding: 8px 13px; cursor: pointer; flex: none;
+  backdrop-filter: blur(6px);
+}
+.scanner .sc-btn[aria-pressed=true] { background: #fff; color: #0b0b0b; border-color: #fff; }
+.scanner .sc-bottom {
+  position: relative; z-index: 2; margin-top: auto; text-align: center;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  padding-top: 18px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, .65));
+  display: flex; flex-direction: column; gap: 11px; align-items: center;
+}
+.scanner .sc-status {
+  font-size: 13.5px; line-height: 1.45; max-width: 36ch;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .7);
+}
+.scanner .sc-status.err { color: #ffb3ae; }
+.scanner .sc-hit {
+  position: absolute; inset: 0; background: rgba(255, 255, 255, .9); z-index: 3;
+  animation: flash .32s ease-out forwards; pointer-events: none;
+}
+@keyframes flash { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .scanner .sc-hit { animation-duration: .01s; } }
+
+/* ---------------- full-screen code view ---------------- *
+ * Always white with black bars, whatever the page theme is: a scanner
+ * reads reflectance, and a dark card would simply not scan.
+ * ------------------------------------------------------------------- */
+.codeview {
+  position: fixed; inset: 0; z-index: 60;
+  background: #ffffff; color: #0b0b0b;
+  display: flex; flex-direction: column;
+  user-select: none; -webkit-user-select: none;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.codeview .cv-bar {
+  display: flex; align-items: center; gap: 10px; flex: none;
+  padding-left: max(12px, env(safe-area-inset-left, 0px));
+  padding-right: max(12px, env(safe-area-inset-right, 0px));
+  padding-block: 10px;
+}
+.codeview .cv-title {
+  flex: 1; min-width: 0; text-align: center;
+  font-size: 15px; font-weight: 600; letter-spacing: -.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.codeview .cv-btn {
+  border: 1px solid #d8d7d0; background: #ffffff; color: #0b0b0b;
+  border-radius: 8px; font-size: 14px; font-weight: 500;
+  padding: 8px 13px; cursor: pointer; flex: none;
+}
+.codeview .cv-btn:hover { border-color: #898781; }
+.codeview .stage { flex: 1; min-height: 0; display: grid; place-items: center; overflow: hidden; padding: 6px; }
+/* Keep module edges hard when the canvas is scaled up. */
+.codeview .stage canvas { display: block; image-rendering: pixelated; }
+.codeview .stage.rot canvas { transform: rotate(90deg); }
+.codeview .cv-foot {
+  flex: none; text-align: center; padding: 10px 16px 14px;
+  display: flex; flex-direction: column; gap: 5px; align-items: center;
+}
+.codeview .cv-num {
+  font-family: var(--font-mono); font-size: 17px; letter-spacing: .06em;
+  color: #0b0b0b; user-select: text; -webkit-user-select: text;
+  word-break: break-all; max-width: 100%; line-height: 1.3;
+}
+.codeview .cv-meta { font-size: 11.5px; color: #52514e; }
+.codeview .cv-problem { color: #d03b3b; font-size: 13.5px; max-width: 40ch; margin: 0 auto; }
+</style>
+</head>
+<body>
+
+<script src="vendor/qrcode-generator-1.4.4.js"></script>
+<script src="vendor/jsbarcode-3.11.6.all.min.js"></script>
+<script src="lib/codes.js"></script>
+
+<div class="bar">
+  <div class="inner">
+    <h1>My Cards</h1>
+    <button class="barbtn go" id="btn-scan" title="Scan a card with the camera">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/>
+        <path d="M7 12h10"/>
+      </svg>
+      Scan
+    </button>
+    <button class="barbtn" id="btn-add" title="Add a card by typing its number">Type</button>
+  </div>
+</div>
+
+<main>
+  <div id="flash"></div>
+  <div class="cards" id="cards"></div>
+
+  <div class="empty" id="empty" hidden>
+    <h2>No cards yet</h2>
+    <p>Point the camera at the barcode on a loyalty card and it gets added. Tap it at the till and the
+      barcode fills the screen, big enough to scan off the glass.</p>
+    <div class="btns">
+      <button class="btn go" id="btn-first-scan">Scan a card</button>
+      <button class="btn" id="btn-first-type">Type one in</button>
+      <button class="btn" id="btn-example">Load an example</button>
+    </div>
+  </div>
+
+  <footer>
+    <p><b>Cards live in this browser only.</b> They are not synced anywhere, which is the point, but it also
+      means clearing site data wipes them. Export a backup once you have added a few.</p>
+    <div class="acts">
+      <button class="btn small" id="btn-export">Export backup</button>
+      <button class="btn small filepick" id="btn-import">Import backup
+        <input type="file" id="f-import" accept=".json,application/json" aria-label="Backup file to import">
+      </button>
+    </div>
+    <p id="install-tip"></p>
+  </footer>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var C = window.CODES;
+  /* A two-character helper for document.getElementById, nothing more:
+     there is no jQuery or any other framework on this page. */
+  var byId = function (id) { return document.getElementById(id); };
+  var KEY = 'qr-cards.v1';
+
+  /* Card color choices. */
+  var SWATCHES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948',
+                  '#1f2126', '#565c66'];
+
+  var cards = [];
+  var storageOK = true;
+
+  /* ---------------------------- storage ---------------------------- */
+  function load() {
+    try {
+      var parsed = JSON.parse(localStorage.getItem(KEY) || '[]');
+      cards = Array.isArray(parsed) ? parsed : [];
+    } catch (e) { cards = []; storageOK = false; }
+    cards = cards.filter(function (c) {
+      return c && typeof c.payload === 'string' && C.FORMATS[c.format];
+    });
+  }
+  function persist() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(cards));
+      storageOK = true;
+    } catch (e) { storageOK = false; }
+    renderFlash();
+  }
+  function renderFlash(kind, html) {
+    var el = byId('flash');
+    if (!kind && !storageOK) {
+      kind = 'warn';
+      html = '<b>This browser is not storing the cards.</b> They will be gone when you close the tab. ' +
+        'Private browsing and blocked site data both cause this. Export a backup to keep them.';
+    }
+    if (!kind) { el.innerHTML = ''; return; }
+    el.innerHTML = '<div class="note ' + kind + '" style="margin-bottom:14px">' + html + '</div>';
+  }
+  function uid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  /* ---------------------------- the list ---------------------------- */
+  function render() {
+    var host = byId('cards');
+    host.innerHTML = '';
+    byId('empty').hidden = cards.length > 0;
+
+    cards.forEach(function (card) {
+      var bg = C.fromHex(card.color) || C.fromHex(SWATCHES[0]);
+      var fg = C.autoFg(bg), lb = C.autoLabel(bg);
+
+      var slot = document.createElement('div');
+      slot.className = 'slot';
+
+      var tile = document.createElement('button');
+      tile.className = 'tile';
+      tile.type = 'button';
+      tile.style.background = C.rgbCss(bg);
+      tile.style.color = C.rgbCss(fg);
+      tile.setAttribute('aria-label', 'Show ' + (card.name || 'card'));
+
+      var top = document.createElement('div');
+      if (card.label) {
+        var lab = document.createElement('div');
+        lab.className = 't-label';
+        lab.style.color = C.rgbCss(lb);
+        lab.textContent = card.label;
+        top.appendChild(lab);
+      }
+      var nm = document.createElement('div');
+      nm.className = 't-name';
+      nm.textContent = card.name || 'Untitled card';
+      top.appendChild(nm);
+
+      var foot = document.createElement('div');
+      foot.className = 't-foot';
+      var num = document.createElement('span');
+      num.className = 't-num';
+      num.textContent = card.payload;
+      var fmt = document.createElement('span');
+      fmt.className = 't-fmt';
+      fmt.style.color = C.rgbCss(lb);
+      fmt.textContent = C.FORMATS[card.format].name;
+      foot.appendChild(num);
+      foot.appendChild(fmt);
+
+      tile.appendChild(top);
+      tile.appendChild(foot);
+      tile.addEventListener('click', function () { openCode(card); });
+
+      var ed = document.createElement('button');
+      ed.className = 'tile-edit';
+      ed.type = 'button';
+      ed.title = 'Edit ' + (card.name || 'card');
+      ed.setAttribute('aria-label', 'Edit ' + (card.name || 'card'));
+      ed.textContent = '⋯';
+      ed.style.color = C.rgbCss(fg);
+      ed.addEventListener('click', function (e) { e.stopPropagation(); openEditor(card); });
+
+      slot.appendChild(tile);
+      slot.appendChild(ed);
+      host.appendChild(slot);
+    });
+  }
+
+  /* ------------------------ full-screen code ------------------------ */
+  var view = null, wakeLock = null, userRotate = null, currentCard = null;
+
+  async function keepAwake(on) {
+    try {
+      if (on && navigator.wakeLock && !wakeLock) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', function () { wakeLock = null; });
+      } else if (!on && wakeLock) {
+        var w = wakeLock; wakeLock = null;
+        await w.release();
+      }
+    } catch (e) { wakeLock = null; }   // unsupported on most of iOS; harmless
+  }
+
+  /* A 1D barcode is wider than it is tall, so on a portrait screen turning
+     it ninety degrees makes the bars substantially bigger. */
+  function layoutCode() {
+    if (!view || !currentCard) return;
+    var stage = view.querySelector('.stage');
+    var cv = stage.querySelector('canvas');
+    if (!cv) return;
+    var sw = stage.clientWidth - 12, sh = stage.clientHeight - 12;
+    if (sw <= 0 || sh <= 0) return;
+    var ar = cv.width / cv.height;
+    var flat = Math.min(sw, sh * ar);
+    var turned = Math.min(sh, sw * ar);
+    var canTurn = C.FORMATS[currentCard.format].shape === 'wide';
+    var turn = userRotate === null ? (canTurn && turned > flat * 1.12) : (canTurn && userRotate);
+    var w = turn ? turned : flat;
+    cv.style.width = Math.floor(w) + 'px';
+    cv.style.height = Math.floor(w / ar) + 'px';
+    stage.classList.toggle('rot', turn);
+    var rb = view.querySelector('.cv-rotate');
+    if (rb) rb.hidden = !canTurn;
+  }
+
+  function openCode(card) {
+    // Close first: closeCode() clears currentCard, so it has to run before
+    // the new card is assigned, not after.
+    closeCode();
+    currentCard = card;
+    userRotate = null;
+
+    view = document.createElement('div');
+    view.className = 'codeview';
+
+    var bar = document.createElement('div');
+    bar.className = 'cv-bar';
+    var done = document.createElement('button');
+    done.className = 'cv-btn';
+    done.type = 'button';
+    done.textContent = 'Done';
+    done.addEventListener('click', closeCode);
+    var title = document.createElement('div');
+    title.className = 'cv-title';
+    title.textContent = card.name || 'Card';
+    var rot = document.createElement('button');
+    rot.className = 'cv-btn cv-rotate';
+    rot.type = 'button';
+    rot.textContent = 'Turn';
+    rot.addEventListener('click', function () {
+      userRotate = !view.querySelector('.stage').classList.contains('rot');
+      layoutCode();
+    });
+    bar.appendChild(done);
+    bar.appendChild(title);
+    bar.appendChild(rot);
+
+    var stage = document.createElement('div');
+    stage.className = 'stage';
+    var foot = document.createElement('div');
+    foot.className = 'cv-foot';
+
+    try {
+      // Drawn generously: a scanner reading off a phone screen needs pixels.
+      stage.appendChild(C.draw(card.format, card.payload, { height: 190, width: 5, targetPx: 760 }));
+      var num = document.createElement('div');
+      num.className = 'cv-num';
+      num.textContent = card.payload;
+      foot.appendChild(num);
+      var meta = document.createElement('div');
+      meta.className = 'cv-meta';
+      meta.textContent = C.FORMATS[card.format].name + (card.label ? ' · ' + card.label : '');
+      foot.appendChild(meta);
+    } catch (e) {
+      var p = document.createElement('p');
+      p.className = 'cv-problem';
+      p.textContent = e.message;
+      stage.appendChild(p);
+      var fix = document.createElement('button');
+      fix.className = 'cv-btn';
+      fix.type = 'button';
+      fix.textContent = 'Edit this card';
+      fix.addEventListener('click', function () { closeCode(); openEditor(card); });
+      foot.appendChild(fix);
+    }
+
+    view.appendChild(bar);
+    view.appendChild(stage);
+    view.appendChild(foot);
+    document.body.appendChild(view);
+    document.body.style.overflow = 'hidden';
+
+    layoutCode();
+    keepAwake(true);
+    done.focus();
+  }
+
+  function closeCode() {
+    if (!view) return;
+    view.remove();
+    view = null;
+    currentCard = null;
+    if (!byId('scrim')) document.body.style.overflow = '';
+    keepAwake(false);
+  }
+
+  /* ------------------------- camera scanner ------------------------- */
+  var scanner = null, scanStream = null, scanTimer = null, scanTick = 0;
+
+  function scanStatus(text, isError) {
+    if (!scanner) return;
+    var el = scanner.querySelector('.sc-status');
+    el.innerHTML = text;
+    el.classList.toggle('err', !!isError);
+  }
+
+  /* Draw a centered fraction of the current video frame, scaled so the
+     wide edge is at most maxW. More pixels read better, but every frame
+     costs time, so this stays modest.
+
+     The reader reports corner points in the coordinate space of whatever
+     canvas it was handed, so the confirmation crop is taken from this same
+     canvas rather than from the video. Mapping back to the video would
+     mean undoing both the centering offset and this scale, and getting
+     that wrong silently yields a crop of the wrong part of the picture. */
+  function frameCanvas(video, maxW, fracW, fracH) {
+    var vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh) return null;
+    var rw = vw * fracW, rh = vh * fracH;
+    var scale = Math.min(1, maxW / rw);
+    var cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round(rw * scale));
+    cv.height = Math.max(1, Math.round(rh * scale));
+    var cx = cv.getContext('2d', { willReadFrequently: true });
+    cx.drawImage(video, (vw - rw) / 2, (vh - rh) / 2, rw, rh, 0, 0, cv.width, cv.height);
+    return cv;
+  }
+
+  /* A copy, so a pass can be tone-mapped for the reader while the original
+     stays as it looked, for the confirmation crop. Both are the same size,
+     so corner points from one apply to the other unchanged. */
+  function copyCanvas(cv) {
+    var out = document.createElement('canvas');
+    out.width = cv.width;
+    out.height = cv.height;
+    out.getContext('2d').drawImage(cv, 0, 0);
+    return out;
+  }
+
+  async function openScanner(onFound) {
+    closeScanner();
+
+    scanner = document.createElement('div');
+    scanner.className = 'scanner';
+    scanner.innerHTML =
+      '<video playsinline muted autoplay></video>' +
+      '<div class="sc-mask"></div>' +
+      '<div class="sc-top">' +
+        '<button class="sc-btn sc-cancel" type="button">Cancel</button>' +
+        '<div class="sc-title">Point at the barcode</div>' +
+        '<button class="sc-btn sc-torch" type="button" aria-pressed="false" hidden>Light</button>' +
+      '</div>' +
+      '<div class="sc-bottom">' +
+        '<div class="sc-status"><span class="spin"></span> Starting the camera&hellip;</div>' +
+        '<button class="sc-btn sc-photo filepick" type="button">Use a picture instead' +
+          '<input type="file" accept="image/*" aria-label="Picture of the barcode">' +
+        '</button>' +
+      '</div>';
+    document.body.appendChild(scanner);
+    document.body.style.overflow = 'hidden';
+
+    var video = scanner.querySelector('video');
+    video.muted = true;
+    video.setAttribute('playsinline', '');   // iOS refuses to inline without it
+
+    scanner.querySelector('.sc-cancel').addEventListener('click', closeScanner);
+    scanner.querySelector('.sc-photo input').addEventListener('change', async function () {
+      var f = this.files && this.files[0];
+      if (f) await fromPicture(f, onFound);
+    });
+
+    try { await C.loadDecoders('vendor/'); }
+    catch (e) {
+      scanStatus('<b>The barcode reader could not be loaded.</b> Check that the <code>vendor/</code> ' +
+        'folder sits next to this page.', true);
+      return;
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      scanStatus(location.protocol === 'https:' || location.hostname === 'localhost'
+        ? 'This browser will not give a page access to the camera. Use a picture instead.'
+        : 'The camera is only available over HTTPS. Serve this page over HTTPS, or use a picture instead.',
+        true);
+      return;
+    }
+
+    // A high-resolution frame matters: thin bars disappear at low resolution.
+    var tries = [
+      { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
+      { video: { facingMode: 'environment' }, audio: false },
+      { video: true, audio: false }
+    ];
+    var err = null;
+    for (var i = 0; i < tries.length && !scanStream; i++) {
+      try { scanStream = await navigator.mediaDevices.getUserMedia(tries[i]); }
+      catch (e) { err = e; }
+    }
+    if (!scanStream) {
+      var name = (err && err.name) || '';
+      scanStatus(
+        name === 'NotAllowedError' || name === 'SecurityError'
+          ? '<b>Camera access was refused.</b> Allow it for this page in your browser settings, or use a picture instead.'
+          : name === 'NotFoundError' || name === 'DevicesNotFoundError'
+            ? 'No camera was found on this device. Use a picture instead.'
+            : '<b>The camera could not be started.</b> ' + esc(name || 'Unknown error') + '. Use a picture instead.',
+        true);
+      return;
+    }
+    if (!scanner) { stopStream(); return; }   // canceled while waiting
+
+    video.srcObject = scanStream;
+    try { await video.play(); } catch (e) { /* autoplay attribute covers it */ }
+
+    var track = scanStream.getVideoTracks()[0];
+    // Continuous autofocus, where the camera offers it; barcodes are close up.
+    try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) { /* optional */ }
+
+    var torchBtn = scanner.querySelector('.sc-torch');
+    var caps = track.getCapabilities ? track.getCapabilities() : {};
+    if (caps && caps.torch) {
+      torchBtn.hidden = false;
+      torchBtn.addEventListener('click', async function () {
+        var on = torchBtn.getAttribute('aria-pressed') !== 'true';
+        try {
+          await track.applyConstraints({ advanced: [{ torch: on }] });
+          torchBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        } catch (e) { torchBtn.hidden = true; }
+      });
+    }
+
+    scanStatus('Hold the card steady, filling the frame.');
+    scanTick = 0;
+
+    (function tick() {
+      if (!scanner || !scanStream) return;
+      scanTick++;
+      if (video.readyState >= 2 && video.videoWidth) {
+        // Most of the frame first, which suits a QR code held anywhere in it.
+        var full = frameCanvas(video, 1000, 0.98, 0.98);
+        if (full) {
+          var r1 = C.decodeFrame(full);
+          if (r1) { hit(r1, full); return; }
+        }
+        // Then a contrast-boosted center band, which is where a 1D barcode
+        // ends up and where the extra resolution pays off. The boost goes on
+        // a copy so the crop can still show the frame as it looked.
+        if (scanTick % 2 === 0) {
+          var band = frameCanvas(video, 1280, 0.96, 0.42);
+          if (band) {
+            var boosted = copyCanvas(band);
+            C.applyTone(boosted, false, true);
+            var r2 = C.decodeFrame(boosted);
+            if (r2) { hit(r2, band); return; }
+          }
+        }
+      }
+      scanTimer = setTimeout(tick, 80);
+    })();
+
+    /* `source` is the canvas the code was found in, so its corner points
+       need no conversion. */
+    function hit(result, source) {
+      if (!scanner) return;
+      var flashEl = document.createElement('div');
+      flashEl.className = 'sc-hit';
+      scanner.appendChild(flashEl);
+      try { if (navigator.vibrate) navigator.vibrate(55); } catch (e) { /* optional */ }
+      var got = C.adopt(result);
+      var crop = C.cropFrom(source, result.points, 1);
+      closeScanner();
+      onFound(got, crop);
+    }
+  }
+
+  async function fromPicture(file, onFound) {
+    scanStatus('<span class="spin"></span> Reading the picture&hellip;');
+    try { await C.loadDecoders('vendor/'); }
+    catch (e) { scanStatus('The barcode reader could not be loaded.', true); return; }
+    var img;
+    try { img = await C.loadImage(file); }
+    catch (e) { scanStatus(esc(e.message), true); return; }
+    var r = C.decode(img);
+    if (!r) {
+      scanStatus('<b>No barcode found in that picture.</b> Crop it closer to the barcode, or hold the ' +
+        'camera square to the card and try the live view.', true);
+      return;
+    }
+    var got = C.adopt(r);
+    var crop = C.cropFrom(img, r.points, r.scale || 1);
+    closeScanner();
+    onFound(got, crop);
+  }
+
+  function stopStream() {
+    if (!scanStream) return;
+    scanStream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) { /* already gone */ } });
+    scanStream = null;
+  }
+  function closeScanner() {
+    clearTimeout(scanTimer);
+    scanTimer = null;
+    stopStream();
+    if (scanner) { scanner.remove(); scanner = null; }
+    if (!byId('scrim') && !view) document.body.style.overflow = '';
+  }
+
+  /* Scanning straight from the bar: read a code, then open the editor on it. */
+  function scanThenEdit() {
+    openScanner(function (got, crop) {
+      openEditor(null, { payload: got.text, format: got.format }, { note: got.note, crop: crop, detected: got.detected });
+    });
+  }
+
+  /* ---------------------------- editor ---------------------------- */
+  var editing = null;
+
+  function openEditor(card, seed, scanInfo) {
+    closeEditor();
+    editing = card || null;
+    var base = card
+      ? { name: card.name, label: card.label || '', payload: card.payload, format: card.format, color: card.color }
+      : { name: '', label: '', payload: '', format: 'AUTO', color: SWATCHES[cards.length % 8] };
+    // A seed overrides the base field by field, which is how a re-scan keeps
+    // the name and color already typed while replacing the code.
+    var draft = {};
+    ['name', 'label', 'payload', 'format', 'color'].forEach(function (k) {
+      draft[k] = (seed && seed[k] !== undefined) ? seed[k] : base[k];
+    });
+
+    var scrim = document.createElement('div');
+    scrim.className = 'scrim';
+    scrim.id = 'scrim';
+    scrim.addEventListener('click', function (e) { if (e.target === scrim) closeEditor(); });
+
+    var sheet = document.createElement('div');
+    sheet.className = 'sheet';
+    sheet.setAttribute('role', 'dialog');
+    sheet.setAttribute('aria-modal', 'true');
+    sheet.setAttribute('aria-label', card ? 'Edit card' : 'Add card');
+    sheet.innerHTML =
+      '<h2>' + (card ? 'Edit card' : 'Add a card') + '</h2>' +
+      '<div class="grabbers">' +
+        '<button class="btn go wide" id="e-scan" type="button">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+            '<path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M7 12h10"/>' +
+          '</svg>Scan the barcode with the camera</button>' +
+        '<div class="or">or type it</div>' +
+      '</div>' +
+      '<div id="e-scaninfo"></div>' +
+      '<label class="fld"><span>Number on the card</span>' +
+        '<textarea id="e-payload" class="mono" spellcheck="false" placeholder="4012345678901"></textarea></label>' +
+      '<label class="fld"><span>Barcode type</span><select id="e-format"></select></label>' +
+      '<div id="e-preview"></div>' +
+      '<hr>' +
+      '<div class="row2">' +
+        '<label class="fld"><span>Shop or card name</span>' +
+          '<input type="text" id="e-name" maxlength="40" placeholder="Example Market"></label>' +
+        '<label class="fld"><span>Label (optional)</span>' +
+          '<input type="text" id="e-label" maxlength="24" placeholder="Loyalty"></label>' +
+      '</div>' +
+      '<div class="fld"><span>Color</span>' +
+        '<div class="sws" id="e-sws"></div>' +
+        '<div class="customrow">' +
+          '<input type="color" class="sw-custom" id="e-color" aria-label="Pick a custom color">' +
+          '<input type="text" class="mono hexin" id="e-hex" spellcheck="false" maxlength="7" ' +
+            'autocapitalize="off" autocomplete="off" aria-label="Color as a hex value">' +
+          '<span class="hint" id="e-colorhint"></span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="acts">' +
+        (card ? '<button class="btn danger" id="e-delete" type="button">Delete</button>' : '') +
+        '<span class="grow"></span>' +
+        '<button class="btn" id="e-cancel" type="button">Cancel</button>' +
+        '<button class="btn go" id="e-save" type="button">' + (card ? 'Save' : 'Add card') + '</button>' +
+      '</div>';
+
+    scrim.appendChild(sheet);
+    document.body.appendChild(scrim);
+    document.body.style.overflow = 'hidden';
+
+    var sel = byId('e-format');
+    var auto = document.createElement('option');
+    auto.value = 'AUTO';
+    auto.textContent = 'Work it out from the number';
+    sel.appendChild(auto);
+    C.ORDER.forEach(function (k) {
+      var o = document.createElement('option');
+      o.value = k;
+      o.textContent = C.FORMATS[k].name;
+      sel.appendChild(o);
+    });
+
+    byId('e-name').value = draft.name;
+    byId('e-label').value = draft.label;
+    byId('e-payload').value = draft.payload;
+    sel.value = draft.format;
+
+    /* Redraws the swatch row and the custom controls from draft.color, so
+       there is one source of truth however the color was chosen. */
+    function paintColor() {
+      var cur = draft.color.toLowerCase();
+      var host = byId('e-sws');
+      host.innerHTML = '';
+      SWATCHES.forEach(function (hex) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'sw';
+        b.style.background = hex;
+        b.title = hex;
+        b.setAttribute('aria-label', 'Use ' + hex);
+        b.setAttribute('aria-pressed', cur === hex ? 'true' : 'false');
+        b.addEventListener('click', function () { draft.color = hex; paintColor(); });
+        host.appendChild(b);
+      });
+
+      var picker = byId('e-color'), hex = byId('e-hex');
+      picker.value = draft.color;
+      picker.classList.toggle('on', SWATCHES.indexOf(cur) === -1);
+      // Leave the text field alone while it is being typed into.
+      if (document.activeElement !== hex) hex.value = draft.color;
+
+      var bg = C.fromHex(draft.color);
+      byId('e-colorhint').textContent = bg
+        ? (C.autoFg(bg)[0] > 128 ? 'white text' : 'dark text') +
+          ', ' + C.contrast(bg, C.autoFg(bg)).toFixed(1) + ':1'
+        : '';
+    }
+
+    byId('e-color').addEventListener('input', function () {
+      var c = C.fromHex(this.value);
+      if (c) { draft.color = C.toHex(c); paintColor(); }
+    });
+    byId('e-hex').addEventListener('input', function () {
+      var c = C.fromHex(this.value);
+      if (c) { draft.color = C.toHex(c); paintColor(); }
+    });
+    // Put a half-typed or invalid value back to the color actually in use.
+    byId('e-hex').addEventListener('blur', function () { this.value = draft.color; });
+
+    paintColor();
+
+    function resolved() {
+      return sel.value === 'AUTO' ? C.autoFormat(byId('e-payload').value.trim()) : sel.value;
+    }
+
+    function refresh() {
+      var fmt = resolved();
+      var payload = byId('e-payload').value.trim();
+      var host = byId('e-preview');
+      host.innerHTML = '';
+      var box = document.createElement('div');
+      box.className = 'minibox';
+      var problem = C.validate(fmt, payload);
+      if (!problem) {
+        try { box.appendChild(C.draw(fmt, payload, { height: 90, width: 2, targetPx: 300 })); }
+        catch (e) { problem = e.message; }
+      }
+      if (problem) {
+        box.innerHTML = '';
+        var ph = document.createElement('div');
+        ph.className = 'ph';
+        ph.textContent = problem === 'empty' ? 'Scan or type the number to see the barcode' : problem;
+        box.appendChild(ph);
+      }
+      host.appendChild(box);
+      if (sel.value === 'AUTO' && payload && !problem) {
+        var m = document.createElement('p');
+        m.style.cssText = 'margin:7px 0 0;font-size:12px;color:var(--ink-3)';
+        m.textContent = 'Reading it as ' + C.FORMATS[fmt].name +
+          '. If the till will not take it, scan the card itself or set the type by hand.';
+        host.appendChild(m);
+      }
+      byId('e-save').disabled = !!problem;
+    }
+
+    byId('e-payload').addEventListener('input', refresh);
+    sel.addEventListener('change', refresh);
+
+    function showScanInfo(info) {
+      var host = byId('e-scaninfo');
+      if (!info) { host.innerHTML = ''; return; }
+      var html = info.detected
+        ? 'Read a <b>' + esc(String(info.detected).replace(/_/g, ' ')) + '</b> barcode.'
+        : '';
+      if (info.note) html += (html ? '<br>' : '') + esc(info.note);
+      if (info.crop) {
+        html += '<div class="found"><img src="' + info.crop + '" alt="The barcode that was read">' +
+          '<span>This is what it read.</span></div>';
+      }
+      host.innerHTML = html ? '<div class="note ' + (info.note ? 'warn' : 'ok') + '">' + html + '</div>' : '';
+    }
+    showScanInfo(scanInfo);
+    refresh();
+
+    byId('e-scan').addEventListener('click', function () {
+      // Keep what has been typed, and the card being edited, across the
+      // reopen: closeEditor() clears `editing`.
+      var keep = {
+        name: byId('e-name').value, label: byId('e-label').value, color: draft.color
+      };
+      var who = editing;
+      openScanner(function (got, crop) {
+        closeEditor();
+        openEditor(who, {
+          payload: got.text, format: got.format,
+          name: keep.name, label: keep.label, color: keep.color
+        }, { note: got.note, crop: crop, detected: got.detected });
+      });
+    });
+
+    byId('e-cancel').addEventListener('click', closeEditor);
+    if (byId('e-delete')) {
+      byId('e-delete').addEventListener('click', function () {
+        var b = byId('e-delete');
+        if (b.dataset.armed !== '1') {
+          // confirm() is unavailable in some embeddings, so arm the button.
+          b.dataset.armed = '1';
+          b.textContent = 'Really delete?';
+          setTimeout(function () {
+            if (b.dataset.armed === '1') { b.dataset.armed = ''; b.textContent = 'Delete'; }
+          }, 4000);
+          return;
+        }
+        cards = cards.filter(function (c) { return c.id !== editing.id; });
+        persist(); render(); closeEditor();
+      });
+    }
+    byId('e-save').addEventListener('click', function () {
+      var fmt = resolved();
+      var payload = byId('e-payload').value.trim();
+      if (C.validate(fmt, payload)) return;
+      var rec = {
+        id: editing ? editing.id : uid(),
+        name: byId('e-name').value.trim() || 'Untitled card',
+        label: byId('e-label').value.trim(),
+        payload: payload,
+        format: fmt,
+        color: draft.color
+      };
+      if (editing) cards = cards.map(function (c) { return c.id === editing.id ? rec : c; });
+      else cards.push(rec);
+      persist(); render(); closeEditor();
+    });
+
+    (draft.payload ? byId('e-name') : byId('e-payload')).focus();
+  }
+
+  function closeEditor() {
+    var s = byId('scrim');
+    if (s) s.remove();
+    editing = null;
+    if (!view && !scanner) document.body.style.overflow = '';
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (scanner) closeScanner();
+    else if (view) closeCode();
+    else if (byId('scrim')) closeEditor();
+  });
+  window.addEventListener('resize', layoutCode);
+  window.addEventListener('orientationchange', function () { setTimeout(layoutCode, 120); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { if (scanner) closeScanner(); }
+    else if (view) keepAwake(true);
+  });
+
+  /* ---------------------------- backup ---------------------------- */
+  function download(name, text, type) {
+    var url = URL.createObjectURL(new Blob([text], { type: type }));
+    var a = document.createElement('a');
+    a.href = url; a.download = name; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 20000);
+  }
+  byId('btn-export').addEventListener('click', function () {
+    var b = byId('btn-export');
+    if (!cards.length) {
+      b.textContent = 'Nothing to export';
+      setTimeout(function () { b.textContent = 'Export backup'; }, 2000);
+      return;
+    }
+    download('my-cards-' + new Date().toISOString().slice(0, 10) + '.json',
+      JSON.stringify({ format: 'qr-cards.v1', exported: new Date().toISOString(), cards: cards }, null, 2),
+      'application/json');
+  });
+  byId('f-import').addEventListener('change', function () {
+    var f = this.files && this.files[0];
+    this.value = '';
+    if (!f) return;
+    var fr = new FileReader();
+    fr.onload = function () {
+      var added = 0, replaced = 0, skipped = 0;
+      try {
+        var data = JSON.parse(fr.result);
+        var list = Array.isArray(data) ? data : (data && data.cards);
+        if (!Array.isArray(list)) throw new Error('no card list');
+        list.forEach(function (c) {
+          if (!c || typeof c.payload !== 'string') { skipped++; return; }
+          var fmt = C.FORMATS[c.format] ? c.format : C.autoFormat(c.payload);
+          if (C.validate(fmt, c.payload)) { skipped++; return; }
+          var rec = {
+            id: c.id || uid(),
+            name: String(c.name || 'Untitled card').slice(0, 40),
+            label: String(c.label || '').slice(0, 24),
+            payload: c.payload,
+            format: fmt,
+            color: C.fromHex(c.color) ? c.color : SWATCHES[0]
+          };
+          var at = -1;
+          for (var i = 0; i < cards.length; i++) if (cards[i].id === rec.id) { at = i; break; }
+          if (at === -1) { cards.push(rec); added++; } else { cards[at] = rec; replaced++; }
+        });
+      } catch (e) {
+        renderFlash('bad', '<b>That file could not be imported.</b> It needs to be a backup exported ' +
+          'from this page.');
+        return;
+      }
+      persist(); render();
+      renderFlash('ok', 'Imported ' + added + ' new ' + (added === 1 ? 'card' : 'cards') +
+        (replaced ? ', updated ' + replaced : '') +
+        (skipped ? ', skipped ' + skipped + ' that had no usable number' : '') + '.');
+    };
+    fr.readAsText(f);
+  });
+
+  /* ---------------------------- start ---------------------------- */
+  if (!window.CODES || !window.qrcode || !window.JsBarcode) {
+    document.body.insertAdjacentHTML('afterbegin',
+      '<div class="note bad" style="margin:16px">The barcode libraries did not load. Check that the ' +
+      '<code>vendor/</code> and <code>lib/</code> folders sit next to this file.</div>');
+    return;
+  }
+
+  byId('btn-scan').addEventListener('click', scanThenEdit);
+  byId('btn-first-scan').addEventListener('click', scanThenEdit);
+  byId('btn-add').addEventListener('click', function () { openEditor(null); });
+  byId('btn-first-type').addEventListener('click', function () { openEditor(null); });
+  byId('btn-example').addEventListener('click', function () {
+    cards.push({
+      id: uid(), name: 'Example Market', label: 'Loyalty',
+      payload: '4012345678901', format: 'EAN_13', color: SWATCHES[0]
+    });
+    persist(); render();
+  });
+
+  // An apple-touch-icon so Add to Home Screen gets a real tile, drawn here
+  // rather than shipped as a second binary file.
+  (function appleIcon() {
+    try {
+      var s = 180, cv = document.createElement('canvas');
+      cv.width = cv.height = s;
+      var cx = cv.getContext('2d');
+      cx.fillStyle = '#2a78d6'; cx.fillRect(0, 0, s, s);
+      cx.fillStyle = '#ffffff';
+      var bars = [7, 4, 11, 4, 7, 4, 9, 4, 10], x = 44, y = 52, h = 72;
+      for (var i = 0; i < bars.length && x < s - 40; i++) {
+        if (i % 2 === 0) cx.fillRect(x, y, bars[i], h);
+        x += bars[i];
+      }
+      cx.fillRect(44, y + h + 13, s - 88, 9);
+      var link = document.createElement('link');
+      link.rel = 'apple-touch-icon';
+      link.href = cv.toDataURL('image/png');
+      document.head.appendChild(link);
+    } catch (e) { /* no icon, no problem */ }
+  })();
+
+  // Offline support, so the page still opens in a shop with no signal.
+  // Service workers need http(s); from a file:// URL this is skipped.
+  if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+    navigator.serviceWorker.register('sw.js').then(function () {
+      byId('install-tip').innerHTML = 'On iPhone: open this in Safari, tap Share, then ' +
+        '<b>Add to Home Screen</b>. You get an icon that opens full screen with no address bar, and your ' +
+        'cards still come up when you have no signal.';
+    }).catch(function () {
+      byId('install-tip').textContent = 'You can add this page to your home screen for quick access, but it ' +
+        'will need a connection to open: the offline cache could not be set up in this browser.';
+    });
+  } else {
+    byId('install-tip').innerHTML = 'Opened straight from a file, so there is nothing to cache: everything ' +
+      'this page needs is already on this disk. Note that the camera needs HTTPS, so put the folder on a ' +
+      'web server to scan cards and to get <b>Add to Home Screen</b> on your phone.';
+  }
+
+  load();
+  renderFlash();
+  render();
+})();
+</script>
+</body>
+</html>

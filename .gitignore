@@ -1,0 +1,19 @@
+# Backups exported by the app itself, which hold real loyalty card numbers.
+# The download name is my-cards-YYYY-MM-DD.json. This repo is meant to be
+# public, so a stray export committed here would publish those numbers for
+# good, and rewriting history does not reliably unpublish them.
+my-cards-*.json
+
+# Local TLS certificates. The camera needs a secure origin, so testing on a
+# phone over the LAN means generating a cert and key in this folder. Never
+# commit the key.
+*.pem
+*.key
+*.crt
+*.p12
+.cert/
+
+.DS_Store
+*~
+
+node_modules/

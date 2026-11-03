@@ -212,6 +212,23 @@ main {
 }
 .tile-edit:hover { opacity: 1; background: rgba(255, 255, 255, .2); }
 
+/* ---------------- reordering ---------------- */
+/* The tiles are buttons, and a long press on one would otherwise raise the
+   iOS selection callout instead of starting a drag. */
+.slot { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.tile { transition: transform .16s ease, box-shadow .16s ease; }
+.slot.drag { z-index: 6; }
+.slot.drag .tile {
+  transform: scale(1.03); box-shadow: 0 12px 28px rgba(0, 0, 0, .3); cursor: grabbing;
+}
+body.dragging { cursor: grabbing; }
+.tip { margin: 11px 2px 0; font-size: 12px; color: var(--ink-3); }
+.sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+@media (prefers-reduced-motion: reduce) { .tile { transition: none; } }
+
 /* ---------------- empty state ---------------- */
 .empty {
   border: 1.5px dashed var(--line-2); border-radius: 14px;
@@ -473,6 +490,9 @@ input[type=text].hexin { width: 7.5em; flex: none; }
 <main>
   <div id="flash"></div>
   <div class="cards" id="cards"></div>
+  <p class="tip" id="reorder-tip" hidden>To reorder, drag a card: on a phone, hold it for a
+    moment first. From a keyboard, Alt and an arrow key.</p>
+  <div class="sr" id="live" role="status" aria-live="polite"></div>
 
   <div class="empty" id="empty" hidden>
     <h2>No cards yet</h2>
@@ -554,8 +574,10 @@ input[type=text].hexin { width: 7.5em; flex: none; }
   /* ---------------------------- the list ---------------------------- */
   function render() {
     var host = byId('cards');
+    if (drag) endDrag(false);
     host.innerHTML = '';
     byId('empty').hidden = cards.length > 0;
+    byId('reorder-tip').hidden = cards.length < 2;
 
     cards.forEach(function (card) {
       var bg = C.fromHex(card.color) || C.fromHex(SWATCHES[0]);
@@ -563,6 +585,9 @@ input[type=text].hexin { width: 7.5em; flex: none; }
 
       var slot = document.createElement('div');
       slot.className = 'slot';
+      // What the slot stands for, so a drag can read the new order back off
+      // the DOM without looking anything up by id.
+      slot._card = card;
 
       var tile = document.createElement('button');
       tile.className = 'tile';
@@ -599,6 +624,16 @@ input[type=text].hexin { width: 7.5em; flex: none; }
       tile.appendChild(top);
       tile.appendChild(foot);
       tile.addEventListener('click', function () { openCode(card); });
+      tile.addEventListener('keydown', function (e) {
+        // Alt, Ctrl, or Cmd with an arrow key, so the arrows on their own are
+        // left to the browser for scrolling.
+        if (!e.altKey && !e.ctrlKey && !e.metaKey) return;
+        var step = e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1
+          : e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : 0;
+        if (!step) return;
+        e.preventDefault();
+        moveCard(card, step);
+      });
 
       var ed = document.createElement('button');
       ed.className = 'tile-edit';
@@ -614,6 +649,259 @@ input[type=text].hexin { width: 7.5em; flex: none; }
       host.appendChild(slot);
     });
   }
+
+  /* ------------------------- reordering ------------------------- */
+  /* Pointer events, not HTML5 drag-and-drop, which no mobile browser
+     implements. A mouse picks a card up as soon as it has moved a few
+     pixels; a finger has to hold still for HOLD_MS first, so a flick still
+     scrolls the list. Once a finger is dragging, touchmove is cancelled so
+     the page underneath stays put, which only works because the browser has
+     not started scrolling yet: holding still for the delay is what keeps it
+     from having started. */
+  var HOLD_MS = 400, TOUCH_SLOP = 8, MOUSE_SLOP = 5, EDGE = 72, EDGE_MAX = 13;
+  var SNAP = 'transform 180ms cubic-bezier(.2,.75,.3,1)';
+
+  var drag = null;          // the gesture in progress, or null
+  var swallowClick = false; // a drop leaves a click behind; it must not open the card
+  var edgeRaf = 0;
+  var calmly = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function slots() { return Array.prototype.slice.call(byId('cards').children); }
+  function announce(msg) { byId('live').textContent = msg; }
+
+  function moveCard(card, step) {
+    var from = cards.indexOf(card), to = from + step;
+    if (from < 0 || to < 0 || to >= cards.length) return;
+    cards.splice(from, 1);
+    cards.splice(to, 0, card);
+    persist();
+    render();
+    slots().forEach(function (s) {
+      if (s._card === card) s.querySelector('.tile').focus();
+    });
+    announce((card.name || 'Card') + ' moved to ' + (to + 1) + ' of ' + cards.length + '.');
+  }
+
+  /* Hold the dragged slot under the pointer. Its layout position is measured
+     fresh every time, so this stays right after the list has reordered under
+     it and after the page has scrolled. */
+  function follow() {
+    var s = drag.slot;
+    s.style.transition = 'none';
+    s.style.transform = '';
+    var r = s.getBoundingClientRect();
+    s.style.transform = 'translate(' + (drag.x - drag.gx - r.left) + 'px,' +
+      (drag.y - drag.gy - r.top) + 'px)';
+  }
+
+  /* Where each card sits with nothing dragged, in page coordinates so that a
+     scroll does not invalidate it. Every transform has to be cleared before
+     this runs, which is why it is only ever called from the two places that
+     clear them. */
+  function measure() {
+    var ox = window.pageXOffset, oy = window.pageYOffset;
+    drag.lay = slots().map(function (o) {
+      var r = o.getBoundingClientRect();
+      return { el: o, l: r.left + ox, t: r.top + oy, r: r.right + ox, b: r.bottom + oy };
+    });
+  }
+  function remeasure() {
+    if (!drag || !drag.live) return;
+    slots().forEach(function (o) { o.style.transition = 'none'; o.style.transform = ''; });
+    measure();
+    follow();
+  }
+
+  /* Move the dragged slot to wherever the pointer now is, and slide the cards
+     it displaced out of the way: measure, move, put everything back where it
+     looked a moment ago, then let it transition to its real place.
+
+     The card under the pointer is found against those stored positions rather
+     than against live rectangles. A card sliding into the gap would otherwise
+     be measured in mid-flight, be found under the pointer on the way past,
+     and swap straight back, so a slow drag would shuffle on every frame. */
+  function shuffle() {
+    var host = byId('cards'), s = drag.slot;
+    var r = s.getBoundingClientRect();
+    var cx = r.left + r.width / 2 + window.pageXOffset;
+    var cy = r.top + r.height / 2 + window.pageYOffset;
+    var over = null;
+    for (var i = 0; i < drag.lay.length; i++) {
+      var q = drag.lay[i];
+      if (q.el !== s && cx >= q.l && cx <= q.r && cy >= q.t && cy <= q.b) {
+        over = q.el;
+        break;
+      }
+    }
+    if (!over) return;
+
+    var all = slots();
+    var was = all.map(function (o) { return o.getBoundingClientRect(); });
+    host.insertBefore(s, all.indexOf(over) > all.indexOf(s) ? over.nextSibling : over);
+    all.forEach(function (o) {
+      o.style.transition = 'none';
+      o.style.transform = '';
+    });
+    measure();
+    if (!calmly) {
+      var ox = window.pageXOffset, oy = window.pageYOffset;
+      all.forEach(function (o, n) {
+        if (o === s) return;
+        var at = null;
+        for (var k = 0; k < drag.lay.length; k++) if (drag.lay[k].el === o) at = drag.lay[k];
+        o.style.transform = 'translate(' + (was[n].left - (at.l - ox)) + 'px,' +
+          (was[n].top - (at.t - oy)) + 'px)';
+      });
+      void host.offsetWidth;   // one reflow, so the next line animates
+      all.forEach(function (o) {
+        if (o === s) return;
+        o.style.transition = SNAP;
+        o.style.transform = '';
+      });
+    }
+    follow();
+  }
+
+  /* Dragging to the top or bottom edge scrolls the list, which is the only
+     way to reorder past a screenful of cards on a phone. */
+  function edgeScroll() {
+    edgeRaf = requestAnimationFrame(edgeScroll);
+    if (!drag || !drag.live) return;
+    var h = window.innerHeight, by = 0;
+    if (drag.y < EDGE) by = -Math.ceil((EDGE - drag.y) / EDGE * EDGE_MAX);
+    else if (drag.y > h - EDGE) by = Math.ceil((drag.y - (h - EDGE)) / EDGE * EDGE_MAX);
+    if (!by) return;
+    var at = window.pageYOffset;
+    window.scrollBy(0, by);
+    if (window.pageYOffset !== at) { follow(); shuffle(); }
+  }
+
+  function startDrag() {
+    if (!drag || drag.live) return;
+    clearTimeout(drag.timer);
+    // A card dropped a moment ago may still be settling, and the transform
+    // carrying it there would be measured as though it were the layout.
+    slots().forEach(function (o) { o.style.transition = 'none'; o.style.transform = ''; });
+    var r = drag.slot.getBoundingClientRect();
+    drag.gx = drag.x - r.left;
+    drag.gy = drag.y - r.top;
+    drag.live = true;
+    drag.slot.classList.add('drag');
+    document.body.classList.add('dragging');
+    measure();
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* no buzz */ }
+    follow();
+    edgeRaf = requestAnimationFrame(edgeScroll);
+  }
+
+  /* `keep` is false when the drag is being thrown away rather than dropped,
+     in which case the caller re-renders from the unchanged list. */
+  function endDrag(keep) {
+    if (!drag) return;
+    var d = drag;
+    drag = null;
+    clearTimeout(d.timer);
+    if (!d.live) return;
+    cancelAnimationFrame(edgeRaf);
+    document.body.classList.remove('dragging');
+    var s = d.slot;
+    slots().forEach(function (o) {
+      if (o === s) return;
+      o.style.transition = '';
+      o.style.transform = '';
+    });
+    swallowClick = true;
+    setTimeout(function () { swallowClick = false; }, 500);
+
+    if (!keep) {
+      s.classList.remove('drag');
+      s.style.transition = '';
+      s.style.transform = '';
+      return;
+    }
+    // Settle into the gap rather than jumping to it.
+    var from = s.getBoundingClientRect();
+    s.style.transition = 'none';
+    s.style.transform = '';
+    var to = s.getBoundingClientRect();
+    if (!calmly) {
+      s.style.transform = 'translate(' + (from.left - to.left) + 'px,' +
+        (from.top - to.top) + 'px)';
+      void s.offsetWidth;
+      s.style.transition = SNAP;
+      s.style.transform = '';
+    }
+    setTimeout(function () {
+      if (drag && drag.slot === s) return;   // picked up again mid-settle
+      s.classList.remove('drag');
+      s.style.transition = '';
+      s.style.transform = '';
+    }, calmly ? 0 : 190);
+
+    var order = slots().map(function (o) { return o._card; });
+    if (order.length !== cards.length || order.indexOf(undefined) !== -1) return;
+    var moved = order.some(function (c, i) { return c !== cards[i]; });
+    if (!moved) return;
+    cards = order;
+    persist();
+    announce((s._card.name || 'Card') + ' moved to ' +
+      (order.indexOf(s._card) + 1) + ' of ' + cards.length + '.');
+  }
+
+  byId('cards').addEventListener('pointerdown', function (e) {
+    if (drag || e.button > 0 || cards.length < 2 || view || scanner || byId('scrim')) return;
+    var slot = e.target.closest && e.target.closest('.slot');
+    if (!slot || e.target.closest('.tile-edit')) return;
+    drag = {
+      id: e.pointerId, slot: slot, live: false, timer: 0,
+      touch: e.pointerType !== 'mouse',
+      x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, gx: 0, gy: 0
+    };
+    if (drag.touch) drag.timer = setTimeout(startDrag, HOLD_MS);
+  });
+
+  document.addEventListener('pointermove', function (e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag.x = e.clientX;
+    drag.y = e.clientY;
+    if (drag.live) {
+      e.preventDefault();      // no text selection, no native image drag
+      follow();
+      shuffle();
+      return;
+    }
+    var dx = drag.x - drag.x0, dy = drag.y - drag.y0;
+    if (Math.sqrt(dx * dx + dy * dy) < (drag.touch ? TOUCH_SLOP : MOUSE_SLOP)) return;
+    if (drag.touch) endDrag(true);   // a scroll or a swipe, so let go of it
+    else startDrag();
+  });
+
+  // Non-passive, so the page can be stopped from scrolling under a finger
+  // that is dragging a card.
+  document.addEventListener('touchmove', function (e) {
+    if (drag && drag.live) e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('pointerup', function () { endDrag(true); });
+  // A browser that takes the gesture over mid-drag leaves the list in the
+  // order it is showing, which is the one the drag asked for.
+  document.addEventListener('pointercancel', function () { endDrag(true); });
+  window.addEventListener('blur', function () { endDrag(true); });
+  document.addEventListener('contextmenu', function (e) {
+    if (drag && drag.live) e.preventDefault();
+  });
+  document.addEventListener('dragstart', function (e) {
+    if (drag) e.preventDefault();
+  });
+
+  // A drop ends in a click on the card that was dragged. Opening its barcode
+  // is not what the drag was for.
+  byId('cards').addEventListener('click', function (e) {
+    if (!swallowClick) return;
+    swallowClick = false;
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
 
   /* ------------------------ full-screen code ------------------------ */
   var view = null, wakeLock = null, userRotate = null, currentCard = null;
@@ -1193,11 +1481,15 @@ input[type=text].hexin { width: 7.5em; flex: none; }
 
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    // Escape mid-drag puts the card back: endDrag(false) drops the gesture
+    // without saving it, and render() rebuilds from the untouched list.
+    if (drag && drag.live) { endDrag(false); render(); return; }
     if (scanner) closeScanner();
     else if (view) closeCode();
     else if (byId('scrim')) closeEditor();
   });
   window.addEventListener('resize', layoutCode);
+  window.addEventListener('resize', remeasure);
   window.addEventListener('orientationchange', function () { setTimeout(layoutCode, 120); });
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { if (scanner) closeScanner(); }

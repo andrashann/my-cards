@@ -20,6 +20,10 @@ Leave the type as "work it out from the number" and it guesses: thirteen digits 
 digit is an EAN-13, other ASCII becomes Code 128, anything else becomes a QR code. That guess is
 only a guess, so if a till refuses the card, scan the real barcode or set the type by hand.
 
+To reorder the list, drag a card where you want it. On a phone, hold it still for a moment first, so
+that a flick still scrolls the list; with a mouse it picks up as soon as you move. Escape puts a card
+back mid-drag. From a keyboard, focus a card and hold Alt while pressing an arrow key.
+
 Cards are kept in this browser's `localStorage`. They are not synced anywhere, which is the point,
 but it also means clearing site data wipes them, so there is an export button and an import button
 beside it.
@@ -61,7 +65,7 @@ sw.js                      offline cache
 manifest.webmanifest       so it installs to a home screen
 icon.svg                   app icon
 vendor/                    pinned libraries, no CDN
-tests/                     node tests for lib/codes.js
+tests/                     node tests for lib/codes.js, and a browser test for reordering
 ```
 
 ### Libraries
@@ -106,3 +110,15 @@ renders. It also checks that the automatic text color always takes the higher-co
 prints which card colors fall under 4.5:1 for small text rather than silently passing: `#2a78d6`
 reaches 4.42:1, which clears the 3:1 bar for a card name but not the 4.5:1 bar for the small number
 underneath it.
+
+```sh
+node tests/run-reorder-drag.mjs
+```
+
+24 checks on reordering, which needs real layout and real pointer events, so it serves the page to
+headless Chrome and drives `tests/reorder-drag.html` against it. It covers a mouse drag up and down
+a single column, a sideways drag in the two-column layout, a touch drag that holds first and a flick
+that does not, the saved order, Escape mid-drag, the keyboard move with its focus and announcement,
+and that a plain tap still opens the barcode while the tap left behind by a drop does not. Add
+`--show` to open the same harness in your own browser and watch it. It expects Chrome at the usual
+macOS path; `CHROME=/path/to/chrome` overrides that.

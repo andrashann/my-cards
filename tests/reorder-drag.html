@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Card reordering check</title>
+<style>
+  body { font: 13px/1.5 ui-monospace, monospace; margin: 16px; }
+  iframe { width: 420px; height: 1100px; border: 1px solid #ccc; }
+  .wide { width: 720px; }
+  pre { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>Card reordering check</h1>
+<pre id="out">running…</pre>
+<div id="stage"></div>
+
+<script>
+/* Drives the real page in an iframe with synthetic pointer events, because
+   dragging is layout and gesture behavior that cannot be exercised from node.
+   tests/run-reorder-drag.mjs serves this file and reports the result. */
+(function () {
+  'use strict';
+  var KEY = 'qr-cards.v1';
+  var log = [], fails = 0;
+
+  function ok(pass, what) {
+    log.push((pass ? 'ok    ' : 'FAIL  ') + what);
+    if (!pass) fails++;
+    document.getElementById('out').textContent = log.join('\n');
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function frame() { return new Promise(function (r) { requestAnimationFrame(function () { r(); }); }); }
+
+  function seed(n) {
+    var abc = 'ABCDEFGH', out = [];
+    for (var i = 0; i < n; i++) {
+      out.push({
+        id: 'card-' + abc[i], name: 'Card ' + abc[i], label: '',
+        payload: 'NUMBER' + abc[i], format: 'CODE_128', color: '#2a78d6'
+      });
+    }
+    localStorage.setItem(KEY, JSON.stringify(out));
+  }
+
+  function open(wide) {
+    return new Promise(function (done) {
+      var f = document.createElement('iframe');
+      if (wide) f.className = 'wide';
+      f.src = '../index.html';
+      f.addEventListener('load', function () { done(f); });
+      document.getElementById('stage').innerHTML = '';
+      document.getElementById('stage').appendChild(f);
+    });
+  }
+
+  function names(f) {
+    return Array.prototype.map.call(f.contentDocument.querySelectorAll('.slot .t-name'),
+      function (e) { return e.textContent.replace('Card ', ''); }).join('');
+  }
+  function stored() {
+    return JSON.parse(localStorage.getItem(KEY) || '[]')
+      .map(function (c) { return c.name.replace('Card ', ''); }).join('');
+  }
+  function middle(el) {
+    var r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+  function fire(f, el, type, pt, kind) {
+    el.dispatchEvent(new f.contentWindow.PointerEvent(type, {
+      bubbles: true, cancelable: true, composed: true,
+      pointerId: 1, pointerType: kind || 'mouse', isPrimary: true,
+      button: type === 'pointerup' ? 0 : (type === 'pointerdown' ? 0 : -1),
+      buttons: type === 'pointerup' ? 0 : 1,
+      clientX: pt.x, clientY: pt.y
+    }));
+  }
+
+  /* A real pointer crosses the few pixels that start a drag before it gets
+     anywhere, so a gesture is a press, a nudge, then the move itself. */
+  async function grab(f, n, kind, hold) {
+    var slot = f.contentDocument.querySelectorAll('.slot')[n];
+    var at = middle(slot);
+    var g = { tile: slot.querySelector('.tile'), x: at.x, y: at.y, kind: kind || 'mouse' };
+    fire(f, g.tile, 'pointerdown', at, g.kind);
+    if (hold) await wait(hold);
+    await slide(f, g, { x: at.x, y: at.y + 7 }, 1);
+    return g;
+  }
+  async function slide(f, g, to, steps) {
+    var x0 = g.x, y0 = g.y;
+    for (var i = 1; i <= steps; i++) {
+      fire(f, g.tile, 'pointermove',
+        { x: x0 + (to.x - x0) * i / steps, y: y0 + (to.y - y0) * i / steps }, g.kind);
+      await frame();
+    }
+    g.x = to.x;
+    g.y = to.y;
+  }
+  async function drop(f, g) {
+    fire(f, g.tile, 'pointerup', { x: g.x, y: g.y }, g.kind);
+    await wait(260);
+  }
+  async function drag(f, from, to, kind, hold) {
+    var there = middle(f.contentDocument.querySelectorAll('.slot')[to]);
+    var g = await grab(f, from, kind, hold);
+    await slide(f, g, there, 8);
+    await drop(f, g);
+  }
+
+  async function run() {
+    // --- a mouse drag down a single column ---
+    seed(4);
+    var f = await open(false);
+    ok(f.contentDocument.querySelectorAll('.slot').length === 4, 'four cards are listed');
+    ok(names(f) === 'ABCD', 'they start in order ABCD, got ' + names(f));
+    ok(!f.contentDocument.getElementById('reorder-tip').hidden, 'the reorder hint shows');
+
+    await drag(f, 0, 2, 'mouse');
+    ok(names(f) === 'BCAD', 'mouse drag of the first card onto the third gives BCAD, got ' + names(f));
+    ok(stored() === 'BCAD', 'the new order is saved, got ' + stored());
+
+    // --- and back up again ---
+    await drag(f, 2, 0, 'mouse');
+    ok(names(f) === 'ABCD', 'dragging it back up gives ABCD, got ' + names(f));
+    ok(stored() === 'ABCD', 'the restored order is saved, got ' + stored());
+
+    // --- a finger that holds still first ---
+    await drag(f, 3, 1, 'touch', 520);
+    ok(names(f) === 'ADBC', 'a held touch drag of the last card to second gives ADBC, got ' + names(f));
+
+    // --- a finger that does not hold: a scroll, so nothing moves ---
+    await drag(f, 0, 3, 'touch', 0);
+    ok(names(f) === 'ADBC', 'a touch flick with no hold leaves the order alone, got ' + names(f));
+
+    // --- a plain click still opens the barcode ---
+    seed(4);
+    f = await open(false);
+    var tile = f.contentDocument.querySelector('.slot .tile');
+    var at = middle(tile);
+    fire(f, tile, 'pointerdown', at, 'mouse');
+    fire(f, tile, 'pointerup', at, 'mouse');
+    tile.click();
+    await wait(60);
+    ok(!!f.contentDocument.querySelector('.codeview'), 'a click with no drag still opens the code');
+
+    // --- and the click that ends a drag does not ---
+    seed(4);
+    f = await open(false);
+    var there = middle(f.contentDocument.querySelectorAll('.slot')[2]);
+    var g = await grab(f, 0, 'mouse');
+    await slide(f, g, there, 6);
+    await drop(f, g);
+    g.tile.click();
+    await wait(60);
+    ok(!f.contentDocument.querySelector('.codeview'), 'the click left behind by a drop is swallowed');
+    ok(names(f) === 'BCAD', 'that drag still reordered to BCAD, got ' + names(f));
+
+    // --- Escape mid-drag puts the card back ---
+    seed(4);
+    f = await open(false);
+    there = middle(f.contentDocument.querySelectorAll('.slot')[3]);
+    g = await grab(f, 0, 'mouse');
+    await slide(f, g, there, 6);
+    ok(names(f) === 'BCDA', 'the card is at the bottom mid-drag, got ' + names(f));
+    f.contentDocument.dispatchEvent(new f.contentWindow.KeyboardEvent('keydown', {
+      bubbles: true, cancelable: true, key: 'Escape'
+    }));
+    await wait(80);
+    ok(names(f) === 'ABCD', 'Escape puts it back, got ' + names(f));
+    ok(stored() === 'ABCD', 'and saves nothing, got ' + stored());
+    ok(!f.contentDocument.querySelector('.slot.drag'), 'and the card is put down');
+
+    // --- two columns, so sideways has to work too ---
+    seed(4);
+    f = await open(true);
+    var cols = getComputedStyle(f.contentDocument.getElementById('cards')).gridTemplateColumns;
+    ok(cols.split(' ').length === 2, 'the wide list is two columns, got ' + cols);
+    await drag(f, 0, 1, 'mouse');
+    ok(names(f) === 'BACD', 'a sideways drag swaps the first two, got ' + names(f));
+
+    // --- keyboard ---
+    seed(4);
+    f = await open(false);
+    var k = f.contentDocument.querySelector('.slot .tile');
+    k.focus();
+    k.dispatchEvent(new f.contentWindow.KeyboardEvent('keydown', {
+      bubbles: true, cancelable: true, key: 'ArrowDown', altKey: true
+    }));
+    await wait(40);
+    ok(names(f) === 'BACD', 'Alt and ArrowDown moves the first card down one, got ' + names(f));
+    ok(stored() === 'BACD', 'the keyboard move is saved, got ' + stored());
+    ok(f.contentDocument.activeElement === f.contentDocument.querySelectorAll('.slot')[1].querySelector('.tile'),
+      'focus follows the card that moved');
+    ok(/moved to 2 of 4/.test(f.contentDocument.getElementById('live').textContent),
+      'the move is announced, got "' + f.contentDocument.getElementById('live').textContent + '"');
+
+    // --- a single card has nothing to reorder ---
+    seed(1);
+    f = await open(false);
+    ok(f.contentDocument.getElementById('reorder-tip').hidden, 'one card hides the reorder hint');
+    await drag(f, 0, 0, 'mouse');
+    ok(!f.contentDocument.querySelector('.slot.drag'), 'one card cannot be picked up');
+
+    log.push(fails ? '\n' + fails + ' failing' : '\nall passing');
+    document.getElementById('out').textContent = log.join('\n');
+    try {
+      await fetch('/__result', { method: 'POST', body: log.join('\n') });
+    } catch (e) { /* opened by hand, so just read the page */ }
+  }
+
+  run().catch(function (e) {
+    log.push('FAIL  threw: ' + (e && e.message));
+    document.getElementById('out').textContent = log.join('\n');
+    try { fetch('/__result', { method: 'POST', body: log.join('\n') }); } catch (x) {}
+  });
+})();
+</script>
+</body>
+</html>

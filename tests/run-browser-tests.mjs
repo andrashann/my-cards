@@ -11,7 +11,8 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
-const PAGES = ['reorder-drag.html', 'code-view.html', 'sw-update.html', 'icon.html', 'import-sample.html'];
+const PAGES = ['reorder-drag.html', 'code-view.html', 'sw-update.html', 'icon.html',
+                'import-sample.html', 'share-preview.html'];
 const args = process.argv.slice(2).filter((a) => a !== '--show');
 const SHOW = process.argv.includes('--show');
 const pages = args.length
@@ -24,7 +25,8 @@ if (!pages.length) {
 const TYPES = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
   '.json': 'application/json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2',
-  '.webmanifest': 'application/manifest+json', '.css': 'text/css'
+  '.webmanifest': 'application/manifest+json', '.css': 'text/css',
+  '.png': 'image/png'
 };
 const CHROME = process.env.CHROME ||
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';

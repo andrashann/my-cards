@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Share preview check</title>
+<style>
+  body { font: 13px/1.5 ui-monospace, monospace; margin: 16px; }
+  pre { white-space: pre-wrap; }
+  img { max-width: 600px; border: 1px solid #ccc; display: block; margin-top: 10px; }
+</style>
+</head>
+<body>
+<h1>Share preview check</h1>
+<pre id="out">running…</pre>
+<img id="shot" alt="">
+
+<script>
+/* The tags a link unfurler reads, checked against the file they point at.
+   An unfurler never runs the page's scripts, so this reads index.html as
+   text, the way a crawler gets it, rather than looking at a built DOM.
+   tests/run-browser-tests.mjs serves this file and reports the result. */
+(function () {
+  'use strict';
+  var log = [], fails = 0;
+
+  function ok(pass, what) {
+    log.push((pass ? 'ok    ' : 'FAIL  ') + what);
+    if (!pass) fails++;
+    document.getElementById('out').textContent = log.join('\n');
+  }
+  function load(src, el) {
+    return new Promise(function (res, rej) {
+      el.addEventListener('load', function () { res(el); });
+      el.addEventListener('error', function () { rej(new Error('could not load ' + src)); });
+      el.src = src;
+    });
+  }
+
+  async function run() {
+    var html = await (await fetch('../index.html')).text();
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    function tag(name) {
+      var el = doc.querySelector('meta[property="' + name + '"], meta[name="' + name + '"]');
+      return el ? el.getAttribute('content') : null;
+    }
+
+    // --- everything an unfurler looks for is there ---
+    var need = ['og:type', 'og:site_name', 'og:title', 'og:description', 'og:url', 'og:image',
+                'og:image:width', 'og:image:height', 'og:image:alt',
+                'twitter:card', 'twitter:title', 'twitter:description', 'twitter:image'];
+    var missing = need.filter(function (n) { return !tag(n); });
+    ok(!missing.length, 'all ' + need.length + ' preview tags are set' +
+      (missing.length ? ', missing ' + missing.join(', ') : ''));
+    ok(tag('twitter:card') === 'summary_large_image',
+      'the card is the large image kind, got ' + tag('twitter:card'));
+    ok(tag('og:type') === 'website', 'the type is website, got ' + tag('og:type'));
+
+    // --- and says the same thing the page says ---
+    ok(tag('og:title') === doc.title, 'the preview title matches the page title, got "' +
+      tag('og:title') + '" against "' + doc.title + '"');
+    ok(tag('og:description') === tag('description'),
+      'and the description matches the page description');
+    ok(tag('twitter:title') === tag('og:title') && tag('twitter:description') === tag('og:description') &&
+      tag('twitter:image') === tag('og:image'),
+      'the twitter tags say the same as the og tags');
+    ok((tag('og:image:alt') || '').length > 30 && tag('twitter:image:alt') === tag('og:image:alt'),
+      'the image has alt text on both, got "' + (tag('og:image:alt') || '') + '"');
+
+    // --- the address has to be absolute: a crawler has no page to resolve against ---
+    var img = tag('og:image'), page = tag('og:url');
+    ok(/^https:\/\//.test(img) && /^https:\/\//.test(page),
+      'both URLs are absolute https, got ' + img + ' and ' + page);
+    ok(new URL(img).origin === new URL(page).origin &&
+      new URL(img).pathname.indexOf(new URL(page).pathname) === 0,
+      'the image sits beside the page it previews, got ' + img);
+
+    // --- and the file it names is really there, at the size it claims ---
+    var file = new URL(img).pathname.split('/').pop();
+    var res = await fetch('../' + file);
+    ok(res.ok, 'the file it names is in the repo, got ' + res.status + ' for ' + file);
+    ok((res.headers.get('content-type') || '').indexOf('image/png') === 0,
+      'served as a PNG, got ' + res.headers.get('content-type'));
+    var bytes = (await res.blob()).size;
+    ok(bytes > 10000 && bytes < 1000000,
+      'and is a sensible size, got ' + Math.round(bytes / 1024) + ' kB');
+
+    var shot = await load('../' + file, document.getElementById('shot'));
+    ok(shot.naturalWidth === Number(tag('og:image:width')) &&
+      shot.naturalHeight === Number(tag('og:image:height')),
+      'the declared size is the real size, said ' + tag('og:image:width') + 'x' +
+      tag('og:image:height') + ', got ' + shot.naturalWidth + 'x' + shot.naturalHeight);
+    ok(shot.naturalWidth === 1200 && shot.naturalHeight === 630,
+      'which is the 1200x630 every unfurler expects, got ' +
+      shot.naturalWidth + 'x' + shot.naturalHeight);
+
+    log.push(fails ? '\n' + fails + ' failing' : '\nall passing');
+    document.getElementById('out').textContent = log.join('\n');
+    try {
+      await fetch('/__result', { method: 'POST', body: log.join('\n') });
+    } catch (e) { /* opened by hand, so just read the page */ }
+  }
+
+  run().catch(function (e) {
+    log.push('FAIL  threw: ' + (e && e.message));
+    document.getElementById('out').textContent = log.join('\n');
+    try { fetch('/__result', { method: 'POST', body: log.join('\n') }); } catch (x) {}
+  });
+})();
+</script>
+</body>
+</html>

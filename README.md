@@ -59,6 +59,19 @@ Saved cards are not touched by any of this. They are in `localStorage`, which th
 writes and a new worker never clears, and a reload does not disturb. Clearing the site's data or
 removing the home screen icon is what loses them, so export a backup before doing either.
 
+### Sharing a link
+
+`og-image.png` is what a chat app, a feed, or a message shows when someone posts the page: 1200 by
+630, the size every unfurler expects. It is drawn from `tools/og-image.html` with the page's own
+fonts, palette, and card shapes, so edit that file and run `node tools/make-og-image.mjs` to redraw
+it rather than editing the PNG.
+
+An unfurler never runs the page's scripts, so the picture has to be a file sitting next to the page
+and `og:image` has to name it absolutely. That writes the published address into `index.html`, in
+three lines marked with a comment, and that is the only place it appears: the picture names no host,
+so hosting this elsewhere means editing those three lines and nothing else. The image stays out of
+the service worker's precache, since nothing but a crawler ever asks for it.
+
 ## How it shows a code
 
 The code view is always white with black bars, whatever theme the rest of the page is in: a scanner
@@ -88,7 +101,9 @@ lib/codes.js               formats, validation, drawing, reading, color
 sw.js                      offline cache
 manifest.webmanifest       so it installs to a home screen
 icon.svg                   app icon
+og-image.png               the picture a shared link unfurls into
 sample_cards.json          eight made-up cards, for the import button
+tools/                     redraws og-image.png; nothing the page loads
 vendor/                    pinned libraries, no CDN
 tests/                     node tests for lib/codes.js, and browser tests for the page
 ```
@@ -140,8 +155,8 @@ underneath it.
 node tests/run-browser-tests.mjs
 ```
 
-72 checks that need real layout, real gestures, a real service worker, or real pixels, so they
-cannot run in node: this serves the project to headless Chrome and drives five harnesses against
+86 checks that need real layout, real gestures, a real service worker, or real pixels, so they
+cannot run in node: this serves the project to headless Chrome and drives six harnesses against
 it.
 
 `tests/reorder-drag.html` is 24 checks on reordering: a mouse drag up and down a single column, a
@@ -169,6 +184,12 @@ with the first and last of them, and the whole mark centered in the tile.
 backup button rather than reading it and trusting it: every card arrives, in order, keeping its
 type, number, label, and color, every one of them draws, the eight between them cover all six
 drawable formats, and importing the file twice replaces rather than duplicates.
+
+`tests/share-preview.html` is 14 checks on the link preview, reading `index.html` as text the way a
+crawler gets it rather than as a built DOM: every Open Graph and Twitter tag is set, the title and
+description match the page's own, both URLs are absolute, the image sits beside the page it
+previews, and the file it names is really in the repo, served as a PNG, of a sensible size, and
+1200 by 630 as the tags claim.
 
 Name a harness to run only that one (`node tests/run-browser-tests.mjs code-view`), or add `--show`
 for URLs to open in your own browser and watch. It expects Chrome at the usual macOS path;
